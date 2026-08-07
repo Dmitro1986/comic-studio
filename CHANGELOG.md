@@ -67,3 +67,7 @@
 - `2026-08-04T11:26:32+03:00` — Added UI Publish button, mobile responsive layout (media queries for <768px), and an internal HTML/PNG viewer with a 'Back' button for seamless navigation.
 
 - `2026-08-04T11:38:37+03:00` — Created `DEMOPRODACTION.md` guide and `demo-production` Git branch with mocked heavy ML dependencies (Whisper, yt-dlp) for seamless deployment on minimal 1GB RAM servers.
+
+## 2026-08-07
+
+- `2026-08-07T05:36:00Z` — Настройка `.gitignore` (добавлены `venv/`, `tg-bot/run.sh`, `data/archive/*`, `data/comics/*`) и исправление вызова Mini App в Telegram-боте (`menuButton` camelCase в `setChatMenuButton`, замена текстовой кнопки `"🌐 Web UI"` в главном меню на `webApp`).
