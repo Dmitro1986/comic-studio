@@ -173,6 +173,7 @@ function getScenarioButtons(sc, status) {
     ]);
   }
   buttons.push([Markup.button.callback('🗑 Удалить', `confirm_delete:${sc.id}`)]);
+  buttons.push([getWebUIButton()]);
   return Markup.inlineKeyboard(buttons);
 }
 
@@ -180,8 +181,12 @@ function getMainMenu() {
   return Markup.keyboard([
     ['📋 Черновики', '✨ Создать комикс'],
     ['📂 Все сценарии', '📊 Статистика'],
-    ['ℹ️ Помощь']
+    [getWebUIButton(), 'ℹ️ Помощь']
   ]).resize();
+}
+
+function getWebUIButton() {
+  return Markup.button.webApp('🌐 Web UI', 'https://comic.openaiua.fr/ui/');
 }
 
 const IMAGE_STYLE_BUTTONS = [
@@ -268,7 +273,12 @@ bot.command('start', async (ctx) => {
     `• URL → статья из интернета\n` +
     `• YouTube → видео с субтитрами\n\n` +
     `Используй <b>/help</b> для списка всех команд.`;
+  
   await ctx.reply(welcome, { parse_mode: 'HTML', ...getMainMenu() });
+  await ctx.reply('🌐 Открой <b>Web UI</b> для удобного управления комиксами:', {
+    parse_mode: 'HTML',
+    reply_markup: { inline_keyboard: [[getWebUIButton()]] }
+  });
 });
 
 // /help
@@ -1204,8 +1214,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.error('Не удалось установить меню команд Telegram:', err);
   });
 
+  // Set Mini App menu button
+  const MINI_APP_URL = 'https://comic.openaiua.fr/ui/';
+  bot.telegram.setChatMenuButton({ menuButton: {
+    type: 'web_app',
+    text: '🌐 Открыть Web UI',
+    web_app: { url: MINI_APP_URL }
+  }}).catch(err => {
+    console.error('Не удалось установить Mini App menu button:', err);
+  });
+
   bot.launch().then(() => {
-    console.log(`🤖 Telegram bot запущен в обновлённом режиме. Chat ID: ${CHAT_ID}`);
+    process.stdout.write(`🤖 Telegram bot launched. Chat ID: ${CHAT_ID}\n`);
   }).catch(err => {
     console.error('Failed to launch bot:', err);
   });
