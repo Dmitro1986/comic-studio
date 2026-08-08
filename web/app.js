@@ -70,8 +70,18 @@ export function createApp(runtime, { idGenerator } = {}) {
       const ext = match[2];
       const candidate = store.find(id);
       if (!candidate || !['rendered', 'published'].includes(candidate.state)) return next();
-      const filePath = safeResolve(config.dataRoot, 'comics', `${id}.${ext}`);
-      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return next();
+      let filePath = safeResolve(config.dataRoot, 'comics', `${id}.${ext}`);
+      if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+        if (ext === 'webp') {
+          const fallbackPath = safeResolve(config.dataRoot, 'comics', `${id}.png`);
+          if (fs.existsSync(fallbackPath) && fs.statSync(fallbackPath).isFile()) {
+            res.set('Content-Type', 'image/png');
+            res.set('Cache-Control', 'no-cache, must-revalidate');
+            return res.sendFile(path.resolve(fallbackPath));
+          }
+        }
+        return next();
+      }
       if (ext === 'webp') {
         res.set('Content-Type', 'image/webp');
         res.set('Cache-Control', 'public, max-age=31536000, immutable');

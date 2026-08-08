@@ -82,6 +82,17 @@ export function htmlStaticRouter({ config }) {
       return next(err);
     }
     if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+      if (name.endsWith('.webp')) {
+        const fallbackName = name.replace(/\.webp$/, '.png');
+        try {
+          const fallbackPath = safeResolve(config.dataRoot, 'comics', id, fallbackName);
+          if (fs.existsSync(fallbackPath) && fs.statSync(fallbackPath).isFile()) {
+            res.set('Content-Type', 'image/png');
+            res.set('Cache-Control', 'no-cache, must-revalidate');
+            return res.sendFile(path.resolve(fallbackPath));
+          }
+        } catch {}
+      }
       return next(notFound('PANEL_NOT_FOUND', `Panel file ${name} not found`));
     }
     if (name.endsWith('.webp')) {

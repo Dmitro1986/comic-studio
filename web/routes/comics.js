@@ -17,8 +17,14 @@ export function comicsRouter({ config, store }) {
         if (!candidate || !['rendered', 'published'].includes(candidate.state)) continue;
         const filePath = safeResolve(comicsRoot, filename);
         const stat = fs.statSync(filePath);
-        if (!stat.isFile() || stat.size === 0) continue;
-        items.push({ scenario_id: id, filename, url: `/comics/${filename}`, created: stat.mtime.toISOString() });
+        const hasWebp = fs.existsSync(safeResolve(comicsRoot, `${id}.webp`));
+        items.push({
+          scenario_id: id,
+          filename,
+          url: `/comics/${filename}`,
+          url_webp: hasWebp ? `/comics/${id}.webp` : `/comics/${filename}`,
+          created: stat.mtime.toISOString(),
+        });
       } catch {}
     }
     res.json(items);
