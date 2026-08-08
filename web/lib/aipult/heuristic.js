@@ -65,6 +65,17 @@ const INTENT_VERB = {
 
 // === Public API =============================================================
 
+const IMAGE_STYLE_PATTERNS = {
+  anime:     ['anime', 'аниме'],
+  realistic: ['realistic', 'реалистичный', 'реализм'],
+  cyberpunk: ['cyberpunk', 'киберпанк'],
+  noir:      ['noir', 'нуар'],
+  cartoon:   ['cartoon', 'мультяшный', 'мультфильм'],
+  fantasy:   ['fantasy', 'фэнтези'],
+};
+
+const ART_KEYWORDS = ['рисунок', 'рисунк', 'картинок', 'картинк', 'арт', 'иллюстраци', 'изображени'];
+
 /**
  * Heuristic parser: returns `{intent, style, scenario}` or `{intent: null}`
  * if message is ambiguous and needs LLM.
@@ -72,6 +83,17 @@ const INTENT_VERB = {
 export function parseHeuristic(message, candidates) {
   if (typeof message !== 'string') return { intent: null };
   const msgLower = message.toLowerCase();
+
+  // Check if this is an image style change request (e.g. "стиль рисунка на anime", "арт на аниме")
+  let imageStyle = null;
+  for (const [imgStyle, patterns] of Object.entries(IMAGE_STYLE_PATTERNS)) {
+    if (patterns.some((p) => msgLower.includes(p))) {
+      imageStyle = imgStyle;
+      break;
+    }
+  }
+
+  const isArtRequest = ART_KEYWORDS.some((kw) => msgLower.includes(kw)) || Boolean(imageStyle);
 
   // Find intent
   let intent = null;
@@ -81,9 +103,23 @@ export function parseHeuristic(message, candidates) {
       break;
     }
   }
+
+  // If user requested changing image style / art, route to 'revise' intent
+  if (isArtRequest && (intent === 'restyle' || intent === 'revise' || !intent)) {
+    intent = 'revise';
+    const targetStyle = imageStyle || 'anime';
+    const scenario = (candidates && candidates.length > 0) ? candidates[0] : null;
+    return {
+      intent: 'revise',
+      style: targetStyle,
+      scenario,
+      feedback: `Смени стиль рисунка на ${targetStyle}`,
+    };
+  }
+
   if (!intent) return { intent: null };
 
-  // Find style
+  // Find bubble style
   let style = null;
   for (const [s, patterns] of Object.entries(STYLE_PATTERNS)) {
     if (patterns.some((p) => msgLower.includes(p))) {
@@ -97,11 +133,6 @@ export function parseHeuristic(message, candidates) {
     ? candidates[0]
     : null;
 
-  // For restyle intent, require an EXPLICIT style keyword. Without one,
-  // we'd default to "bubble" and silently overwrite the user's custom style
-  // (UX trap — user said "поменяй стиль у X" expecting to keep current style).
-  // Keep intent='restyle' so the route can detect the case, but set
-  // needsStyle=true so it knows the style is missing.
   if (intent === 'restyle' && !style) {
     return { intent: 'restyle', style: null, scenario, needsStyle: true };
   }
@@ -112,7 +143,7 @@ export function parseHeuristic(message, candidates) {
 /**
  * Build a CommandCard from heuristic result. Pure function, no I/O.
  */
-export function buildHeuristicCard({ intent, style, scenario, message }) {
+export function buildHeuristicCard({ intent, style, scenario, message, feedback }) {
   if (!intent) return null;
 
   const [estimatedTime, estimatedCost, reversible] = INTENT_TIME_COST[intent] || ['<1 сек', '$0', true];
@@ -125,8 +156,9 @@ export function buildHeuristicCard({ intent, style, scenario, message }) {
   } else if (intent === 'render' && scenario) {
     command = `python3 scripts/render_approved.py --scenario-id ${scenario.id}`;
   } else if (intent === 'revise' && scenario) {
-    const feedback = (message || '').replace(/"/g, '\\"');
-    command = `python3 scripts/revise_scenario.py --scenario-id ${scenario.id} --feedback "${feedback}"`;
+    const fbText = feedback || message || '';
+    const fb = fbText.replace(/"/g, '\\"');
+    command = `python3 scripts/revise_scenario.py --scenario-id ${scenario.id} --feedback "${fb}"`;
   } else if (intent === 'view' && scenario) {
     command = `GET /api/scenarios/${scenario.id}`;
   } else if (intent === 'list') {
