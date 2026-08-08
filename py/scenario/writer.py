@@ -207,10 +207,13 @@ def save_scenario(scenario: dict, status: str = "draft") -> str:
     return str(out_path)
 
 
-def _format_feedback_history(feedback_history: list[dict]) -> str:
+def _format_feedback_history(feedback_history: list) -> str:
     lines = []
     for index, item in enumerate(feedback_history, start=1):
-        text = str(item.get("text", "")).strip()
+        if isinstance(item, dict):
+            text = str(item.get("text", "")).strip()
+        else:
+            text = str(item).strip()
         if not text:
             continue
         lines.append(f"{index}. {text}")

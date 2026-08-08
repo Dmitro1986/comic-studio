@@ -333,16 +333,16 @@ function onEdit(cardEl, card) {
     renderCard({ ...card, command: original });
   });
   // Same EXECUTABLE set as in renderCard (must stay in sync)
-  const EDIT_EXECUTABLE = new Set(['restyle']);
+  const EDIT_EXECUTABLE = new Set(['restyle', 'render', 'revise']);
   if (EDIT_EXECUTABLE.has(card.intent)) {
     const run = makeBtn('▶️ Run с правкой', 'aipult-card-btn aipult-card-btn--run', () => {
       try {
         validateCommandString(ta.value);
+        onRun(cardEl, card, ta.value);
       } catch (err) {
-        appendErrorBubble(`${err.code}: ${err.message}`);
-        return;
+        status.textContent = `☒ ${err.code || 'INVALID'}: ${err.message}`;
+        status.className = 'aipult-card-edit-status aipult-card-edit-status--err';
       }
-      onRun(cardEl, card, ta.value);
     });
     newActions.append(cancel, run);
   } else {
@@ -354,9 +354,11 @@ function onEdit(cardEl, card) {
 }
 
 async function onRun(cardEl, card, command) {
+  const scenarioId = card.scenario_id || card.resolved_scenario?.id || '';
+  const fullCard = { ...card, command, scenario_id: scenarioId };
   // Client-side validation (defense-in-depth)
   try {
-    validateCard({ ...card, command });
+    validateCard(fullCard);
   } catch (err) {
     appendErrorBubble(`${err.code || 'INVALID'}: ${err.message}`);
     return;
@@ -367,11 +369,12 @@ async function onRun(cardEl, card, command) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        card_id: card.card_id || '',
+        card_id: card.card_id || ('card_' + Date.now()),
         command,
         intent: card.intent,
-        scenario_id: card.resolved_scenario?.id,
+        scenario_id: scenarioId,
         style: card.style,
+        feedback: card.feedback,
       }),
     });
     const body = await resp.json();

@@ -19,7 +19,7 @@ from py.scenario.writer import revise_scenario
 def main() -> int:
     parser = argparse.ArgumentParser(description="Revise an existing scenario via LLM")
     parser.add_argument("--scenario-id", required=True, help="Canonical scenario ID")
-    parser.add_argument("--scenario-path", required=True, help="Path to canonical scenario JSON")
+    parser.add_argument("--scenario-path", required=False, help="Path to canonical scenario JSON")
     parser.add_argument("--feedback-file", help="Path to JSON array of feedback items")
     parser.add_argument("--feedback", help="Inline JSON array of feedback items")
     parser.add_argument("--source-context-file", help="Optional file with bounded source context")
@@ -29,10 +29,17 @@ def main() -> int:
     parser.add_argument("--out", help="Optional path to write revised scenario JSON")
     args = parser.parse_args()
 
-    if bool(args.feedback_file) == bool(args.feedback):
-        parser.error("Provide exactly one of --feedback-file or --feedback")
+    if not args.feedback_file and not args.feedback:
+        parser.error("Provide one of --feedback-file or --feedback")
 
-    scenario_path = Path(args.scenario_path)
+    if not args.scenario_path:
+        candidates = list(Path("data/scenarios").glob(f"**/{args.scenario_id}.json"))
+        if not candidates:
+            raise SystemExit(f"Scenario file for {args.scenario_id} not found in data/scenarios")
+        scenario_path = candidates[0]
+    else:
+        scenario_path = Path(args.scenario_path)
+
     current = json.loads(scenario_path.read_text(encoding="utf-8"))
     if current.get("id") != args.scenario_id:
         raise SystemExit(f"--scenario-id {args.scenario_id!r} does not match record id {current.get('id')!r}")
@@ -40,7 +47,12 @@ def main() -> int:
     if args.feedback_file:
         feedback = json.loads(Path(args.feedback_file).read_text(encoding="utf-8"))
     else:
-        feedback = json.loads(args.feedback)
+        try:
+            feedback = json.loads(args.feedback)
+            if isinstance(feedback, str):
+                feedback = [feedback]
+        except Exception:
+            feedback = [args.feedback]
     if not isinstance(feedback, list) or not feedback:
         raise SystemExit("feedback list must be non-empty")
 
