@@ -157,6 +157,20 @@ def assemble_comic(
             bubble_positions=bubble_positions,
         )
         result.save(out)
+        try:
+            webp_out = out.with_suffix(".webp")
+            result.save(webp_out, "WEBP", quality=82)
+            logger.info(f"Saved WebP-preview → {webp_out}")
+        except Exception as webp_err:
+            logger.warning(f"WebP conversion failed for preview {out}: {webp_err}")
+        for p in panel_paths:
+            p_path = Path(p)
+            if p_path.exists() and p_path.suffix.lower() == ".png":
+                try:
+                    with Image.open(p_path) as p_img:
+                        p_img.save(p_path.with_suffix(".webp"), "WEBP", quality=82)
+                except Exception:
+                    pass
         logger.info(
             f"Saved PNG-preview via skill lib → {out} "
             f"(preview_mode={preview_mode}, panels={len(images)})"
@@ -172,6 +186,11 @@ def assemble_comic(
             r, c = divmod(i, cols)
             grid.paste(img, (c * w, r * h))
         grid.save(out)
+        try:
+            grid.save(out.with_suffix(".webp"), "WEBP", quality=82)
+        except Exception:
+            pass
+
 
     # ── HTML-страница (variant B — primary artifact) ──────────────────────
     if scenario is not None:

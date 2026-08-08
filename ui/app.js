@@ -509,7 +509,12 @@ async function loadComics() {
     const htmlUrl = `/comics/${id}.html`;
     return `
     <div class="card comic-card">
-      <a href="${c.url}" target="_blank" rel="noopener"><img src="${c.url}" alt="${escapeHtml(c.filename)}" loading="lazy"></a>
+      <a href="${htmlUrl}" target="_blank" rel="noopener">
+        <picture>
+          <source type="image/webp" srcset="/comics/${id}.webp">
+          <img src="${c.url}" alt="${escapeHtml(c.filename)}" loading="lazy">
+        </picture>
+      </a>
       <div class="meta">${escapeHtml(c.filename)}</div>
       <div class="actions">
         <a class="comic-html-btn" href="viewer.html?id=${id}&type=html" title="Открыть HTML-версию (self-contained, inline CSS)">🔗 Открыть HTML</a>

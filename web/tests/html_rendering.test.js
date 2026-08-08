@@ -96,6 +96,37 @@ test('GET /comics/<id>.png still works (backward-compat)', async () => {
   } finally { await server.close(); ctx.project.cleanup(); }
 });
 
+test('GET /comics/<id>.webp returns 200 image/webp with immutable cache control', async () => {
+  const ctx = makeTestRuntime();
+  const dir = path.join(ctx.project.dataRoot, 'scenarios', 'rendered');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'webp-0001.json'), JSON.stringify({ id: 'webp-0001', status: 'rendered' }));
+  const webpHeader = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
+  fs.writeFileSync(path.join(ctx.project.dataRoot, 'comics', 'webp-0001.webp'), webpHeader);
+  const server = await listen(ctx.app);
+  try {
+    const response = await rawFetch(`${server.baseUrl}/comics/webp-0001.webp`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/webp');
+    assert.equal(response.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  } finally { await server.close(); ctx.project.cleanup(); }
+});
+
+test('GET /comics/<id>/panel_1.webp returns 200 image/webp', async () => {
+  const ctx = makeTestRuntime();
+  const panelDir = path.join(ctx.project.dataRoot, 'comics', 'webp-panel-001');
+  fs.mkdirSync(panelDir, { recursive: true });
+  const webpHeader = Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]);
+  fs.writeFileSync(path.join(panelDir, 'panel_1.webp'), webpHeader);
+  const server = await listen(ctx.app);
+  try {
+    const response = await rawFetch(`${server.baseUrl}/comics/webp-panel-001/panel_1.webp`);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/webp');
+    assert.equal(response.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  } finally { await server.close(); ctx.project.cleanup(); }
+});
+
 test('GET /comics/<id>/fonts/Bangers.woff2 returns 200 font/woff2', async () => {
   const ctx = makeTestRuntime();
   writeHtml(ctx.project.dataRoot, 'font-0001');

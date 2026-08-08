@@ -62,7 +62,7 @@ export function htmlStaticRouter({ config }) {
   // HTML ссылается на `./<id>/panel_*.png` — этот endpoint отдаёт файлы.
   // Регистрируется ПОСЛЕ `/comics/:id/fonts/:name` чтобы более специфичный
   // fonts route имел приоритет.
-  const PANEL_RE = /^panel_[1-9][0-9]?\.png$/;
+  const PANEL_RE = /^panel_[1-9][0-9]?\.(png|webp)$/;
   router.get('/comics/:id/:name', asyncRoute(async (req, res, next) => {
     let id;
     try {
@@ -84,8 +84,13 @@ export function htmlStaticRouter({ config }) {
     if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
       return next(notFound('PANEL_NOT_FOUND', `Panel file ${name} not found`));
     }
-    res.set('Content-Type', 'image/png');
-    res.set('Cache-Control', 'no-cache, must-revalidate');
+    if (name.endsWith('.webp')) {
+      res.set('Content-Type', 'image/webp');
+      res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      res.set('Content-Type', 'image/png');
+      res.set('Cache-Control', 'no-cache, must-revalidate');
+    }
     return res.sendFile(path.resolve(filePath));
   }));
 

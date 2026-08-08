@@ -9,9 +9,24 @@ from typing import Optional
 import requests
 
 from py.lib.config import MINIMAX_API_KEY, MINIMAX_BASE_URL
+from py.lib.image_cache import compute_prompt_hash, get_cached_image, save_cached_image
 from py.lib.logging_setup import setup
 
 logger = setup("render.minimax_client")
+
+
+def _convert_to_webp(png_path: Path, quality: int = 82) -> Optional[Path]:
+    """Generates a WebP copy of a PNG image."""
+    try:
+        from PIL import Image
+        webp_path = Path(png_path).with_suffix(".webp")
+        with Image.open(png_path) as img:
+            img.save(webp_path, "WEBP", quality=quality)
+        logger.info(f"Generated WebP → {webp_path}")
+        return webp_path
+    except Exception as err:
+        logger.warning(f"WebP conversion skipped for {png_path}: {err}")
+        return None
 
 
 def generate_image(
@@ -23,8 +38,25 @@ def generate_image(
 ) -> Path:
     """Генерирует одну картинку через MiniMax image-01. Сохраняет в output_path.
 
-    Возвращает Path к сохранённому файлу.
+    Возвращает Path к сохранённому файлу. Ищет в image_cache перед вызовом API.
     """
+    out_path = Path(output_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # 1. Prompt-Image Cache lookup
+    prompt_hash = compute_prompt_hash(
+        character_prompt=subject_reference_b64 or "",
+        scene_prompt=prompt,
+        style=aspect_ratio,
+        seed=seed or 0,
+    )
+    cached_bytes = get_cached_image(prompt_hash)
+    if cached_bytes:
+        out_path.write_bytes(cached_bytes)
+        _convert_to_webp(out_path)
+        logger.info(f"Used cached image ({len(cached_bytes)} bytes) → {out_path}")
+        return out_path
+
     if not MINIMAX_API_KEY:
         raise RuntimeError("MINIMAX_API_KEY not set in .env")
 
@@ -51,7 +83,7 @@ def generate_image(
             "image_file": f"data:image/jpeg;base64,{subject_reference_b64}",
         }]
 
-    logger.info(f"Generating image → {output_path}")
+    logger.info(f"Generating image via MiniMax API → {output_path}")
     resp = requests.post(url, headers=headers, json=payload, timeout=180)
     resp.raise_for_status()
     data = resp.json()
@@ -77,11 +109,12 @@ def generate_image(
     else:
         img_bytes = base64.b64decode(img_b64)
 
-    out_path = Path(output_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_bytes(img_bytes)
+    save_cached_image(prompt_hash, img_bytes)
+    _convert_to_webp(out_path)
     logger.info(f"Saved {len(img_bytes)} bytes → {out_path}")
     return out_path
+
 
 
 def encode_image_b64(path: str | Path) -> str:
