@@ -31,12 +31,12 @@ const INTENT_PATTERNS = [
 ];
 
 const STYLE_PATTERNS = {
-  bubble: ['bubble', 'баббл', 'облачко'],
+  bubble: ['bubble', 'баббл', 'облачко', 'comic', 'комикс', 'классический', 'обычный'],
   star:   ['star', 'звезда'],
   gothic: ['gothic', 'готика', 'готический'],
   boom:   ['boom', 'бум', 'взрыв'],
   memo:   ['memo', 'заметка'],
-  bar:    ['bar', 'полоса', 'панель'],
+  bar:    ['bar', 'полоса', 'панель', 'плашка'],
 };
 
 const INTENT_TIME_COST = {
