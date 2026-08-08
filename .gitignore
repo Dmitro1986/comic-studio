@@ -42,6 +42,7 @@ data/scenarios/published/*
 data/jobs/*
 data/archive/*
 data/.staging/*
+data/.cache/*
 data/.trash/*
 data/freeform/*
 

@@ -37,14 +37,20 @@ export function createApp(runtime, { idGenerator } = {}) {
   app.use(htmlStaticRouter({ config }));
   app.get('/comics/:filename', (req, res, next) => {
     try {
-      const match = /^([A-Za-z0-9_-]{4,64})\.png$/.exec(req.params.filename);
+      const match = /^([A-Za-z0-9_-]{4,64})\.(png|webp)$/.exec(req.params.filename);
       if (!match) return next();
       const id = scenarioId(match[1]);
+      const ext = match[2];
       const candidate = store.find(id);
       if (!candidate || !['rendered', 'published'].includes(candidate.state)) return next();
-      const filePath = safeResolve(config.dataRoot, 'comics', `${id}.png`);
+      const filePath = safeResolve(config.dataRoot, 'comics', `${id}.${ext}`);
       if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) return next();
-      res.set('Cache-Control', 'no-cache, must-revalidate');
+      if (ext === 'webp') {
+        res.set('Content-Type', 'image/webp');
+        res.set('Cache-Control', 'public, max-age=31536000, immutable');
+      } else {
+        res.set('Cache-Control', 'no-cache, must-revalidate');
+      }
       res.sendFile(path.resolve(filePath));
     } catch (error) { next(error); }
   });
