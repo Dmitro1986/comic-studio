@@ -203,8 +203,8 @@ class RenderHtmlTests(unittest.TestCase):
         render_html(_build_layout_dict(), out)
         html = out.read_text(encoding="utf-8")
         # Селекторы с `>` должны попасть в HTML в исходном виде
-        self.assertIn("main.comic--comic > .panel:nth-child(1)", html)
-        self.assertIn("main.comic--comic > .panel:nth-child(2)", html)
+        self.assertIn("main.comic--comic > figure.panel:nth-of-type(1)", html)
+        self.assertIn("main.comic--comic > figure.panel:nth-of-type(2)", html)
         self.assertIn("main.comic--grid > .panel", html)
         self.assertIn("main.comic--vertical > .panel", html)
         # `&gt;` в CSS-правилах быть не должно

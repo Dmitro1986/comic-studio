@@ -34,12 +34,12 @@
         <p>{{ panel.caption }}</p>
       </div>
       {% endif %}
+      {% if panel.bubble_style == 'bar' and panel.caption %}
+      <div class="bubble bubble--bar">
+        <p>{{ panel.caption }}</p>
+      </div>
+      {% endif %}
     </figure>
-    {% if panel.bubble_style == 'bar' and panel.caption %}
-    <div class="bubble bubble--bar">
-      <p>{{ panel.caption }}</p>
-    </div>
-    {% endif %}
     {% endfor %}
   </main>
 
