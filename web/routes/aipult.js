@@ -246,6 +246,7 @@ export function aipultRouter({ config, store, logger, aipultRunner }) {
       command: body.command || '',
       scenario_id: body.scenario_id,
       style: body.style,
+      feedback: body.feedback,
     };
 
     const result = await aipultRunner.execute(card, { requestId: req.id });
