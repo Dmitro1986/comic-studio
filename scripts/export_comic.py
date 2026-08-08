@@ -8,6 +8,8 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from py.lib.export_helper import export_to_pdf, export_to_zip
 
 
