@@ -1,3 +1,4 @@
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -59,7 +60,8 @@ export function loadConfig(env = process.env, overrides = {}) {
   const host = String(overrides.host || env.HOST || '127.0.0.1').trim();
   const port = overrides.port ?? intValue(env, 'PORT', 3000, { min: 1, max: 65535 });
   const dataRoot = path.resolve(overrides.dataRoot || env.DATA_ROOT || path.join(projectRoot, 'data'));
-  const pythonBin = path.resolve(overrides.pythonBin || env.PYTHON_BIN || path.join(projectRoot, '.venv', 'bin', 'python3'));
+  const defaultVenv = path.join(projectRoot, '.venv', 'bin', 'python3');
+  const pythonBin = overrides.pythonBin || env.PYTHON_BIN || (fs.existsSync(defaultVenv) ? defaultVenv : 'python3');
   const allowedOrigins = overrides.allowedOrigins || parseOrigins(env.WEB_ALLOWED_ORIGINS);
   const apiToken = overrides.apiToken ?? env.WEB_API_TOKEN ?? '';
   const remoteMode = !isLoopbackHost(host);
