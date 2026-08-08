@@ -21,15 +21,45 @@ except ImportError:  # pragma: no cover
         from thefuzz import fuzz as _fuzz
         _FUZZ_BACKEND = 'thefuzz'
     except ImportError:
-        raise RuntimeError(
-            "scenario_resolver requires rapidfuzzy or thefuzz. "
-            "Install one via `pip install rapidfuzzy` (preferred) or `pip install thefuzz`."
-        )
+        _fuzz = None
+        _FUZZ_BACKEND = 'pure_python'
+
+
+def _pure_python_partial_ratio(s1: str, s2: str) -> float:
+    """Pure Python partial ratio (Levenshtein similarity of best matching substring)."""
+    s1, s2 = s1.lower(), s2.lower()
+    if not s1 or not s2:
+        return 0.0
+    if s1 in s2:
+        return 100.0
+
+    len1 = len(s1)
+    len2 = len(s2)
+    shorter, longer = (s1, s2) if len1 <= len2 else (s2, s1)
+    l_short, l_long = len(shorter), len(longer)
+
+    best = 0.0
+    for i in range(l_long - l_short + 1):
+        sub = longer[i : i + l_short]
+        dp = list(range(l_short + 1))
+        for j in range(1, l_short + 1):
+            new_dp = [j] + [0] * l_short
+            for k in range(1, l_short + 1):
+                cost = 0 if sub[j - 1] == shorter[k - 1] else 1
+                new_dp[k] = min(dp[k] + 1, new_dp[k - 1] + 1, dp[k - 1] + cost)
+            dp = new_dp
+        dist = dp[l_short]
+        ratio = (1.0 - (dist / l_short)) * 100.0
+        if ratio > best:
+            best = ratio
+    return best
 
 
 def _partial_ratio(needle: str, haystack: str) -> float:
-    """Compatibility shim: rapidfuzzy and thefuzz both expose `partial_ratio`."""
-    return float(_fuzz.partial_ratio(needle, haystack))
+    """Compatibility shim: uses rapidfuzzy/thefuzz if available, else pure Python fallback."""
+    if _fuzz is not None:
+        return float(_fuzz.partial_ratio(needle, haystack))
+    return _pure_python_partial_ratio(needle, haystack)
 
 from py.lib.config import scenarios_dir
 from py.lib.logging_setup import setup

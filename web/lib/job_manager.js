@@ -1,5 +1,7 @@
 import { conflict, unavailable } from './errors.js';
 import { parseJsonResult } from './process_runner.js';
+import { serializeJob } from './job_store.js';
+import { sseBroadcaster } from './sse_broadcaster.js';
 
 function getRevisionScript() {
   return process.env.REVISION_SCRIPT || 'scripts/revise_scenario.py';
@@ -45,8 +47,18 @@ export class JobManager {
     return job;
   }
 
+  _updateJob(id, patch) {
+    const updated = this.jobStore.update(id, patch);
+    if (updated) {
+      const serialized = serializeJob(updated);
+      sseBroadcaster.broadcast(id, 'job_updated', serialized);
+      sseBroadcaster.broadcast('all', 'job_updated', serialized);
+    }
+    return updated;
+  }
+
   async _runRender(job) {
-    this.jobStore.update(job.id, { status: 'running', started_at: new Date().toISOString() });
+    this._updateJob(job.id, { status: 'running', started_at: new Date().toISOString() });
     const args = ['scripts/render_approved.py', '--scenario-id', job.scenario_id, '--json-result'];
     if (job.mode === 'rerender') {
       args.push('--rerender', '--staging-dir', `${this.config.dataRoot}/.staging/${job.id}`);
@@ -62,7 +74,7 @@ export class JobManager {
       });
       const result = parseJsonResult(processResult.stdout);
       if (!result.ok) throw new Error(result.error || 'Renderer reported failure');
-      this.jobStore.update(job.id, {
+      this._updateJob(job.id, {
         status: 'succeeded',
         finished_at: new Date().toISOString(),
         result: { scenario_id: job.scenario_id, comic_path: result.comic_path, render_revision: result.render_revision },
@@ -71,7 +83,7 @@ export class JobManager {
     } catch (error) {
       const current = this.jobStore.get(job.id);
       if (current.status === 'interrupted') return;
-      this.jobStore.update(job.id, {
+      this._updateJob(job.id, {
         status: error.code === 'PROCESS_INTERRUPTED' ? 'interrupted' : 'failed',
         finished_at: new Date().toISOString(),
         error: { code: error.code || 'RENDER_FAILED', message: error.message || 'Render failed' },
@@ -81,7 +93,7 @@ export class JobManager {
   }
 
   async _runRevision(job, { scenarioPath, feedback, sourceContext, revisionKind }) {
-    this.jobStore.update(job.id, { status: 'running', started_at: new Date().toISOString() });
+    this._updateJob(job.id, { status: 'running', started_at: new Date().toISOString() });
     const args = [
       getRevisionScript(),
       '--scenario-id', job.scenario_id,
@@ -102,7 +114,7 @@ export class JobManager {
       });
       const parsed = parseJsonResult(processResult.stdout);
       if (!parsed.ok) throw new Error(parsed.error || 'Revision process reported failure');
-      this.jobStore.update(job.id, {
+      this._updateJob(job.id, {
         status: 'succeeded',
         finished_at: new Date().toISOString(),
         result: { scenario_id: job.scenario_id, revision_at: parsed.revision_at, feedback_count: parsed.feedback_count },
@@ -119,7 +131,7 @@ export class JobManager {
         }
         return;
       }
-      this.jobStore.update(job.id, {
+      this._updateJob(job.id, {
         status: error.code === 'PROCESS_INTERRUPTED' ? 'interrupted' : 'failed',
         finished_at: new Date().toISOString(),
         error: { code: error.code || 'REVISION_FAILED', message: error.message || 'Revision failed' },
