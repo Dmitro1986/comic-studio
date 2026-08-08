@@ -182,7 +182,9 @@ export function buildHeuristicCard({ intent, style, scenario, message, feedback 
   return {
     card_id: uuidv4(),
     intent,
-    style,  // critical: include so runner uses correct style (not defaults to bubble)
+    style,  // critical: include so runner uses correct style
+    scenario_id: scenario ? scenario.id : null,
+    feedback: feedback || message || '',
     command,
     explanation,
     warnings: [],
