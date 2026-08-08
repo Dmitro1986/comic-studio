@@ -225,26 +225,23 @@ export function aipultRouter({ config, store, logger, aipultRunner }) {
   // ── POST /api/aipult/execute ────────────────────────────────────────────────
   router.post('/execute', asyncRoute(async (req, res) => {
     const body = req.body || {};
-    if (!isPlainObject(body)) throw badRequest('INVALID_BODY', 'body must be a JSON object');
-    const cardId = validate.boundedText(body.card_id, { field: 'card_id', max: 128, code: 'INVALID_CARD_ID' });
+    const rawCardId = typeof body.card_id === 'string' && body.card_id.trim() ? body.card_id.trim() : null;
+    const cardId = rawCardId || `card_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
     if (typeof body.command === 'string' && body.command.length > 0) {
       validateCommandString(body.command); // re-validate client-supplied command
     }
 
-    // Phase 1: build a minimal card from body (we don't persist cards yet)
-    if (body.scenario_id !== undefined) {
-      validateScenarioId(body.scenario_id);
-    }
-    if (body.intent !== undefined) {
-      // Will be re-validated by AipultRunner.execute
+    const scenarioId = typeof body.scenario_id === 'string' && body.scenario_id.trim() ? body.scenario_id.trim() : undefined;
+    if (scenarioId) {
+      validateScenarioId(scenarioId);
     }
 
     const card = {
       card_id: cardId,
       intent: body.intent || 'restyle',
       command: body.command || '',
-      scenario_id: body.scenario_id,
+      scenario_id: scenarioId,
       style: body.style,
       feedback: body.feedback,
     };

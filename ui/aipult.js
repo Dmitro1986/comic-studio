@@ -354,7 +354,11 @@ function onEdit(cardEl, card) {
 }
 
 async function onRun(cardEl, card, command) {
-  const scenarioId = card.scenario_id || card.resolved_scenario?.id || '';
+  let scenarioId = card.scenario_id || card.resolved_scenario?.id || card.scenario?.id || '';
+  if (!scenarioId && command) {
+    const match = command.match(/--scenario-id\s+([A-Za-z0-9_-]+)/);
+    if (match) scenarioId = match[1];
+  }
   const fullCard = { ...card, command, scenario_id: scenarioId };
   // Client-side validation (defense-in-depth)
   try {
