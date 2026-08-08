@@ -516,7 +516,7 @@ async function loadComics() {
           <img src="${c.url}" alt="${escapeHtml(c.filename)}" loading="lazy">
         </picture>
       </a>
-      <div class="meta">${escapeHtml(c.filename)}</div>
+      <div class="meta">Комикс ID: ${escapeHtml(id)}</div>
       <div class="actions">
         <a class="comic-html-btn" href="viewer.html?id=${id}&type=html" title="Открыть HTML-версию (self-contained, inline CSS)">🔗 Открыть HTML</a>
         <a class="comic-png-btn" href="viewer.html?id=${id}&type=png" title="Открыть PNG-версию">🖼 PNG</a>
