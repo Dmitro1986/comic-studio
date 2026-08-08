@@ -25,8 +25,35 @@ export function createApp(runtime, { idGenerator } = {}) {
     }
     next();
   });
-  app.use(express.json({ limit: config.bodyLimit }));
+  const rateLimitStore = new Map();
+  const rateLimiter = (req, res, next) => {
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+    if (process.env.ENABLE_RATE_LIMIT !== 'true' && process.env.NODE_ENV !== 'production') return next();
+    const ip = req.ip || req.socket.remoteAddress || '127.0.0.1';
+    const now = Date.now();
+    const windowMs = 15 * 60 * 1000;
+    const max = 60;
 
+    const record = rateLimitStore.get(ip) || { count: 0, resetTime: now + windowMs };
+    if (now > record.resetTime) {
+      record.count = 1;
+      record.resetTime = now + windowMs;
+    } else {
+      record.count += 1;
+    }
+    rateLimitStore.set(ip, record);
+
+    if (record.count > max) {
+      return res.status(429).json({
+        error: { code: 'TOO_MANY_REQUESTS', message: 'Rate limit exceeded. Please try again later.' },
+        request_id: req.id,
+      });
+    }
+    next();
+  };
+
+  app.use('/api', rateLimiter);
+  app.use(express.json({ limit: config.bodyLimit }));
   app.use('/ui', express.static(config.uiRoot, { fallthrough: true, index: 'index.html' }));
   // Expose pure-function modules to the browser. These files contain no
   // secrets and are imported by `ui/aipult.js` via relative path

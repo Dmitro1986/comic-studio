@@ -89,6 +89,24 @@ class ComicStudioMcpServer {
             }
           },
           {
+            name: "export_comic_pdf",
+            description: "Export a rendered comic into a multi-page PDF document for printing",
+            inputSchema: {
+              type: "object",
+              properties: { id: { type: "string" } },
+              required: ["id"]
+            }
+          },
+          {
+            name: "export_comic_zip",
+            description: "Export a rendered comic into a Social ZIP package (panels + HTML)",
+            inputSchema: {
+              type: "object",
+              properties: { id: { type: "string" } },
+              required: ["id"]
+            }
+          },
+          {
             name: "render_comic",
             description: "Start rendering an approved or rendered scenario",
             inputSchema: {
@@ -256,6 +274,16 @@ class ComicStudioMcpServer {
             captions: args.captions
           });
           return { content: [{ type: "text", text: `Success! Comic updated instantly. View at ${API_BASE_URL}/comics/${args.id}.html` }] };
+        }
+
+        if (name === "export_comic_pdf") {
+          const downloadUrl = `${API_BASE_URL}/api/scenarios/${args.id}/export/pdf`;
+          return { content: [{ type: "text", text: `PDF export download link: ${downloadUrl}` }] };
+        }
+
+        if (name === "export_comic_zip") {
+          const downloadUrl = `${API_BASE_URL}/api/scenarios/${args.id}/export/zip`;
+          return { content: [{ type: "text", text: `Social ZIP export download link: ${downloadUrl}` }] };
         }
 
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
