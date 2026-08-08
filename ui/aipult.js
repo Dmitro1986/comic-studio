@@ -186,8 +186,9 @@ function renderCard(card) {
   // executable via subprocess. For view/list/stats, the user can use 📖
   // Подробнее or open the dashboard directly. The runner would otherwise
   // return exit -1 ("AIPULT_INTENT_NOT_EXECUTABLE") on these intents.
-  const EXECUTABLE = new Set(['restyle']);
-  const canRun = EXECUTABLE.has(card.intent) && card.command && card.scenario_id;
+  const EXECUTABLE = new Set(['restyle', 'render', 'revise']);
+  const scenarioId = card.scenario_id || card.resolved_scenario?.id;
+  const canRun = EXECUTABLE.has(card.intent) && card.command && scenarioId;
   if (canRun) {
     const btnRun = makeBtn('▶️ Run', 'aipult-card-btn aipult-card-btn--run', () => onRun(root, card, card.command));
     actions.append(btnRun);

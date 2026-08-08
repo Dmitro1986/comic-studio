@@ -16,17 +16,24 @@ import {
   AipultValidationError,
 } from './validator.js';
 
-const PHASE1_EXECUTABLE_INTENTS = new Set(['restyle']); // render/publish deferred
+const EXECUTABLE_INTENTS = new Set(['restyle', 'render', 'revise']);
 
 function buildArgs(intent, scenarioId, extra) {
   if (intent === 'restyle') {
     const style = (extra && extra.style) || 'bubble';
     return ['scripts/restyle.py', '--scenario-id', scenarioId, '--style', style];
   }
+  if (intent === 'render') {
+    return ['scripts/render_approved.py', '--scenario-id', scenarioId];
+  }
+  if (intent === 'revise') {
+    const feedback = (extra && extra.feedback) || 'Смени стиль рисунка';
+    return ['scripts/revise_scenario.py', '--scenario-id', scenarioId, '--feedback', feedback];
+  }
   throw new AipultValidationError(
     'AIPULT_INTENT_NOT_EXECUTABLE',
-    `Intent '${intent}' is not executable in Phase 1 (allowed: ${[...PHASE1_EXECUTABLE_INTENTS].join(', ')})`,
-    { intent, allowed_executable: [...PHASE1_EXECUTABLE_INTENTS] },
+    `Intent '${intent}' is not executable (allowed: ${[...EXECUTABLE_INTENTS].join(', ')})`,
+    { intent, allowed_executable: [...EXECUTABLE_INTENTS] },
   );
 }
 
@@ -54,11 +61,11 @@ export class AipultRunner {
     validateCard(card);
     const { intent, command, scenario_id: scenarioId } = card;
 
-    if (!PHASE1_EXECUTABLE_INTENTS.has(intent)) {
+    if (!EXECUTABLE_INTENTS.has(intent)) {
       throw new AipultValidationError(
         'AIPULT_INTENT_NOT_EXECUTABLE',
-        `Intent '${intent}' is advisory-only in Phase 1`,
-        { intent, allowed: [...PHASE1_EXECUTABLE_INTENTS] },
+        `Intent '${intent}' is not executable (allowed: ${[...EXECUTABLE_INTENTS].join(', ')})`,
+        { intent, allowed: [...EXECUTABLE_INTENTS] },
       );
     }
     if (!scenarioId || !/^[A-Za-z0-9_-]{4,64}$/.test(scenarioId)) {
@@ -68,7 +75,7 @@ export class AipultRunner {
     // Re-validate the command string (defense-in-depth)
     validateCommandString(command);
 
-    const args = buildArgs(intent, scenarioId, { style: card.style });
+    const args = buildArgs(intent, scenarioId, { style: card.style, feedback: card.feedback });
     const effectiveTimeout = Number.isInteger(timeoutMs)
       ? timeoutMs
       : (this.config.aipultTimeoutMs || 30_000);
