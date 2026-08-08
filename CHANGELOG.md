@@ -71,3 +71,8 @@
 ## 2026-08-07
 
 - `2026-08-07T05:36:00Z` — Настройка `.gitignore` (добавлены `venv/`, `tg-bot/run.sh`, `data/archive/*`, `data/comics/*`) и исправление вызова Mini App в Telegram-боте (`menuButton` camelCase в `setChatMenuButton`, замена текстовой кнопки `"🌐 Web UI"` в главном меню на `webApp`).
+
+## 2026-08-08
+
+- `2026-08-08T13:53:00Z` — Исправлен дефолтный порт MCP-сервера с 3300 на 3000 в `mcp-server/index.js`, добавлен фильтр `|safe` для CSS шаблона в `comic.html.j2` для предотвращения экранирования дочерних комбинаторов `>` в `&gt;`, добавлен юнит-тест `test_child_combinators_preserved_in_css`.
+

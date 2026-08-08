@@ -194,6 +194,24 @@ class RenderHtmlTests(unittest.TestCase):
         self.assertIn("bubble-pop", html)
         self.assertNotIn('rel="stylesheet"', html)
 
+    def test_child_combinators_preserved_in_css(self):
+        """Regression: jinja2 autoescape раньше превращал `>` в `&gt;` в CSS,
+        ломая дочерние селекторы `main.comic--comic > .panel:nth-child(N)` и
+        `main.comic--grid > .panel` / `main.comic--vertical > .panel`.
+        Сейчас CSS помечен `|safe` и `>` остаётся как есть."""
+        out = self.tmp_path / "test001.html"
+        render_html(_build_layout_dict(), out)
+        html = out.read_text(encoding="utf-8")
+        # Селекторы с `>` должны попасть в HTML в исходном виде
+        self.assertIn("main.comic--comic > .panel:nth-child(1)", html)
+        self.assertIn("main.comic--comic > .panel:nth-child(2)", html)
+        self.assertIn("main.comic--grid > .panel", html)
+        self.assertIn("main.comic--vertical > .panel", html)
+        # `&gt;` в CSS-правилах быть не должно
+        self.assertNotIn("main.comic--comic &gt; .panel", html)
+        self.assertNotIn("main.comic--grid &gt; .panel", html)
+        self.assertNotIn("main.comic--vertical &gt; .panel", html)
+
     def test_uses_relative_paths_for_fonts_and_panels(self):
         out = self.tmp_path / "test001.html"
         render_html(_build_layout_dict(), out)

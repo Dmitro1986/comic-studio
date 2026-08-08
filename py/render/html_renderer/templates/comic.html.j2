@@ -7,7 +7,12 @@
   <title>{{ title }}{% if comic_id %} — {{ comic_id }}{% endif %}</title>
   <style>
 /* comic.css — inlined at render time by html_renderer.render_html */
-{{ css }}
+/* |safe обязателен: autoescape в jinja2 превращает child combinator в HTML entity,
+   ломая дочерние селекторы `main.comic--comic > .panel:nth-child(N)` и
+   `main.comic--grid > .panel` / `main.comic--vertical > .panel`. CSS грузится
+   из пакета (style guide), не из user input, поэтому помечаем safe. Все
+   остальные поля (title/caption/style) проходят autoescape для XSS-защиты. */
+{{ css | safe }}
   </style>
 </head>
 <body>
