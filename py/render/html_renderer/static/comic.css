@@ -285,7 +285,10 @@ main.comic--vertical > .panel {
 
 /* ── Responsive: mobile vertical stack ─────────────────────────────────────── */
 @media (max-width: 768px) {
-  body { padding: 12px 8px 48px; }
+  body {
+    padding: 12px 8px 48px;
+    overflow-x: hidden;
+  }
 
   main.comic,
   main.comic--comic,
@@ -293,19 +296,29 @@ main.comic--vertical > .panel {
   main.comic--vertical {
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
+    width: 100%;
   }
 
-  main.comic--comic > .panel,
-  main.comic--grid > .panel,
+  main.comic--comic > .panel:nth-child(1) {
+    grid-column: span 1;
+    aspect-ratio: 16 / 9;
+  }
+
+  main.comic--comic > .panel:nth-child(n+2),
+  main.comic--grid > .panel {
+    grid-column: span 1;
+    aspect-ratio: 4 / 3;
+  }
+
   main.comic--vertical > .panel {
     grid-column: span 1;
-    aspect-ratio: 16 / 10;
+    aspect-ratio: 16 / 9;
   }
 
   .bubble {
-    max-width: 80%;
-    font-size: clamp(1rem, 4.5vw, 1.4rem);
-    padding: 10px 14px;
+    max-width: 90%;
+    font-size: clamp(0.9rem, 4vw, 1.25rem);
+    padding: 8px 12px;
   }
 }
 
