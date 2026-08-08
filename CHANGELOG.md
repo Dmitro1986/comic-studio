@@ -76,7 +76,8 @@
 - `2026-08-08T14:02:00Z` — Разделены ветки git: в `main` восстановлена полная версия со всеми ML-зависимостями (`yt-dlp`, `openai-whisper`), а рабочее окружение сервера переведено на ветку `demo-production` со всеми актуальными исправлениями.
 - `2026-08-08T14:47:00Z` — Реализована Фаза 1 (PRD_NEW1.md): модуль кэширования промтов `image_cache.py` (SHA256), автоматическая генерация `.webp` копий для панелей и превью комиксов (quality 82), отдача WebP с заголовками immutable кэша в Web API, адаптивные `<picture>` теги в Web UI, 112/112 тестов Node.js и 3/3 тестов image_cache проходят.
 - `2026-08-08T15:02:00Z` — Реализована Фаза 2 (PRD_NEW1.md): встроенный Pure-Python Levenshtein fallback в `scenario_resolver.py` (73/73 тестов Python проходят на любом сервере), класс `SseBroadcaster` и эндпоинт `GET /api/jobs/:id/stream` для трансляции изменений статусов задач в реальном времени, 113/113 тестов Node.js проходят.
-- `2026-08-08T15:29:00Z` — Реализована Фаза 3 (PRD_NEW1.md): модуль экспорта `export_helper.py` и скрипт `export_comic.py` (PDF через Pillow, Social ZIP), эндпоинты `GET /api/scenarios/:id/export/{pdf,zip}`, MCP инструменты `export_comic_pdf` и `export_comic_zip`, кнопки скачивания в Web UI, middleware защиты rate-limiting в `web/app.js`, 115/115 тестов Node.js и 75/75 тестов Python проходят.
+- `2026-08-08T19:24:00Z` — Добавлена поддержка смены арт-стиля рисунков (`anime`, `realistic`, `cyberpunk` и др.) в AiPULT чате (`web/lib/aipult/heuristic.js`), включена исполняемая кнопка `▶️ Run` для интентов `revise` и `render` (`ui/aipult.js`), опциональный `--scenario-path` в `scripts/revise_scenario.py`, гибкая поддержка строкового `--feedback` в `py/scenario/writer.py`, смягчены серверные проверки `card_id` и `scenario_id` в `web/routes/aipult.js` (исправлены `HTTP 400`). 115/115 тестов Node.js и 75/75 тестов Python проходят.
+
 
 
 
