@@ -519,6 +519,8 @@ async function loadComics() {
       <div class="actions">
         <a class="comic-html-btn" href="viewer.html?id=${id}&type=html" title="Открыть HTML-версию (self-contained, inline CSS)">🔗 Открыть HTML</a>
         <a class="comic-png-btn" href="viewer.html?id=${id}&type=png" title="Открыть PNG-версию">🖼 PNG</a>
+        <a class="comic-pdf-btn" href="/api/scenarios/${id}/export/pdf" download title="Скачать PDF для печати">📥 PDF</a>
+        <a class="comic-zip-btn" href="/api/scenarios/${id}/export/zip" download title="Скачать Social ZIP архив">📦 ZIP</a>
       </div>
     </div>`;
   }).join('');

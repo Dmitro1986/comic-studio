@@ -46,6 +46,33 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
     res.json({ ...serializeScenario(candidate.record, { detail: true }), request_id: req.id });
   });
 
+  router.get('/:id/export/:format', asyncRoute(async (req, res, next) => {
+    const id = validate.scenarioId(req.params.id);
+    const fmt = (req.params.format || '').toLowerCase();
+    if (!['pdf', 'zip'].includes(fmt)) return next();
+
+    const candidate = store.find(id);
+    if (!candidate || !['rendered', 'published'].includes(candidate.state)) {
+      return next(notFound('EXPORT_NOT_READY', 'Scenario must be rendered or published to export'));
+    }
+
+    const outPath = validate.safeResolve(config.dataRoot, 'comics', `${id}.${fmt}`);
+    const args = ['scripts/export_comic.py', '--scenario-id', id, '--format', fmt, '--output', outPath, '--json-result'];
+    const processResult = await runner.run(config.pythonBin, args, {
+      cwd: config.projectRoot,
+      timeoutMs: 30000,
+      outputLimit: config.processOutputLimit,
+      requestId: req.id,
+      operation: `scenario.export.${fmt}`,
+    });
+    const result = parseJsonResult(processResult.stdout);
+    if (!result.ok) throw new Error(result.error || 'Export process failed');
+
+    res.set('Content-Type', fmt === 'pdf' ? 'application/pdf' : 'application/zip');
+    res.set('Content-Disposition', `attachment; filename="${id}.${fmt}"`);
+    return res.sendFile(outPath);
+  }));
+
   router.post('/:id/approve', asyncRoute(async (req, res) => {
     const id = validate.scenarioId(req.params.id);
     const result = await lifecycle.approve(id);
