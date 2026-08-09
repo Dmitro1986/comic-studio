@@ -109,7 +109,20 @@ export class ScenarioStore {
     }
     if (!transition || transition.from !== state || transition.to !== record.status || !STATES.includes(transition.to)) {
       if (record.status !== state) {
-        throw conflict('SCENARIO_STATE_MISMATCH', 'Scenario directory and status do not match', { id: record.id, directory: state });
+        if (STATES.includes(record.status)) {
+          const destination = this.scenarioPath(record.status, record.id);
+          if (!fs.existsSync(destination)) {
+            fs.renameSync(sourcePath, destination);
+            this.logger?.warn('scenario.state_mismatch.auto_healed', { scenario_id: record.id, from: state, to: record.status });
+            return { state: record.status, path: destination, record };
+          }
+        }
+        // Fallback self-heal: sync record.status to directory state
+        const fixedRecord = { ...record, status: state };
+        delete fixedRecord._transition;
+        atomicWriteJson(sourcePath, fixedRecord);
+        this.logger?.warn('scenario.state_mismatch.status_synced', { scenario_id: record.id, directory: state });
+        return { state, path: sourcePath, record: fixedRecord };
       }
       return candidate;
     }
@@ -159,8 +172,10 @@ export class ScenarioStore {
         const id = file.slice(0, -5);
         try {
           scenarioId(id);
-          const candidate = this._candidate(state, id);
-          if (candidate.record.status !== state) throw conflict('SCENARIO_STATE_MISMATCH', 'Scenario directory and status do not match');
+          let candidate = this._candidate(state, id);
+          if (candidate.record.status !== state || candidate.record._transition) {
+            candidate = this.reconcileOne(candidate);
+          }
           if (seen.has(id)) throw conflict('SCENARIO_STATE_CONFLICT', 'Duplicate scenario ID');
           seen.add(id);
           items.push(candidate.record);
