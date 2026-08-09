@@ -153,10 +153,7 @@ main.comic--vertical > .panel {
   filter: drop-shadow(0 -2px 0 #000);
 }
 
-.bubble--bubble::after,
-.bubble--memo::after {
-  /* Tail points down-and-inward for bottom-* positions, up-and-inward for top-* */
-}
+/* Tail points down-and-inward for bottom-* positions, up-and-inward for top-* */
 
 .bubble--bottom-left::after  { left: 14%;  bottom: -34px; transform: rotate(180deg); }
 .bubble--bottom-right::after { right: 14%; bottom: -34px; transform: rotate(180deg); }
