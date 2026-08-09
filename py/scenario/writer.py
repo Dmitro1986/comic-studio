@@ -238,7 +238,8 @@ def _validate_revision_response(payload: dict) -> None:
             raise ValueError(f"revise_scenario: panel #{index} prompt exceeds {MAX_PROMPT_CHARS} chars")
         if not caption:
             raise ValueError(f"revise_scenario: panel #{index} has empty caption")
-        if len(caption.split()) > MAX_CAPTION_WORDS:
+        words = caption.split()
+        if len(words) > MAX_CAPTION_WORDS:
             raise ValueError(f"revise_scenario: panel #{index} caption exceeds {MAX_CAPTION_WORDS} words")
 
 
@@ -290,6 +291,14 @@ def revise_scenario(
     )
     raw = _call_minimax_chat(REVISION_SYSTEM_PROMPT, user_msg)
     revised = _extract_json(raw)
+
+    if isinstance(revised, dict) and isinstance(revised.get("panels"), list):
+        for panel in revised["panels"]:
+            if isinstance(panel, dict) and isinstance(panel.get("caption"), str):
+                words = panel["caption"].split()
+                if len(words) > MAX_CAPTION_WORDS:
+                    panel["caption"] = " ".join(words[:MAX_CAPTION_WORDS])
+
     _validate_revision_response(revised)
 
     revised.setdefault("title", current_scenario.get("title"))
