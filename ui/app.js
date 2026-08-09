@@ -258,7 +258,7 @@ activateTab(knownTab ? initialTab : 'draft');
 
 async function loadTab(name) {
   if (name === 'comics') return loadComics();
-  if (name === 'help' || name === 'create') return; // Static/local form content, no fetch needed
+  if (name === 'help' || name === 'create' || name === 'aipult') return; // Static/local tab content, no scenario fetch needed
   const [resScen, resJobs] = await Promise.all([
     apiFetch(`/api/scenarios?status=${name}`),
     apiFetch(`/api/jobs`)
