@@ -237,6 +237,33 @@
 .aipult-card-btn--run:hover {
   filter: brightness(1.1);
 }
+.aipult-card-btn--running {
+  background: #ff9800 !important;
+  border-color: #ff9800 !important;
+  color: #ffffff !important;
+  font-weight: 600;
+  cursor: wait;
+  animation: pulse-busy 1.5s ease-in-out infinite;
+}
+.aipult-card-busy-badge {
+  background: rgba(255, 152, 0, 0.15);
+  border: 1px solid #ff9800;
+  border-left: 4px solid #ff9800;
+  color: #ff9800;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.25rem 0;
+  animation: pulse-busy 1.5s ease-in-out infinite;
+}
+@keyframes pulse-busy {
+  0% { opacity: 1; }
+  50% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
 .aipult-card-btn--reject {
   margin-left: auto;
 }
