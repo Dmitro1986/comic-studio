@@ -32,18 +32,56 @@ if (!BOT_TOKEN) {
 
 const bot = new Telegraf(BOT_TOKEN);
 
+import { defaultUserStore } from './user_store.js';
+
 // User state tracking for multi-step flows (e.g. prompt creation or edit feedback)
 const userState = new Map();
 
 // ── Authorization ────────────────────────────────────────────────────────────
 function assertAuthorized(ctx) {
-  const chatId = String(ctx.chat?.id ?? ctx.message?.chat?.id ?? '');
-  if (chatId !== CHAT_ID) {
-    ctx.reply('⛔ <b>Доступ ограничен.</b> Вы не авторизованы для использования этого бота.', { parse_mode: 'HTML' }).catch(() => {});
+  const userId = String(ctx.from?.id ?? ctx.chat?.id ?? '');
+  if (!defaultUserStore.isAuthorized(userId)) {
+    const text = `⛔ <b>Доступ ограничен. Ваш Telegram ID:</b> <code>${userId}</code>\n\n` +
+      `Вы не верифицированы для использования бота. Обратитесь к администратору для получения доступа.`;
+    ctx.reply(text, { parse_mode: 'HTML' }).catch(() => {});
     return false;
   }
   return true;
 }
+
+// ── Admin User Management ───────────────────────────────────────────────────
+bot.command('add_user', (ctx) => {
+  if (!assertAuthorized(ctx)) return;
+  const parts = ctx.message.text.split(/\s+/);
+  const targetId = parts[1];
+  if (!targetId) {
+    return ctx.reply('Использование: <code>/add_user &lt;telegram_id&gt;</code>', { parse_mode: 'HTML' });
+  }
+  defaultUserStore.addUser(targetId);
+  ctx.reply(`✅ Пользователь <code>${escapeHtml(targetId)}</code> добавлен в список разрешённых.`, { parse_mode: 'HTML' });
+});
+
+bot.command('remove_user', (ctx) => {
+  if (!assertAuthorized(ctx)) return;
+  const parts = ctx.message.text.split(/\s+/);
+  const targetId = parts[1];
+  if (!targetId) {
+    return ctx.reply('Использование: <code>/remove_user &lt;telegram_id&gt;</code>', { parse_mode: 'HTML' });
+  }
+  const removed = defaultUserStore.removeUser(targetId);
+  if (removed) {
+    ctx.reply(`🗑 Пользователь <code>${escapeHtml(targetId)}</code> удалён из списка разрешённых.`, { parse_mode: 'HTML' });
+  } else {
+    ctx.reply(`⚠️ Пользователь <code>${escapeHtml(targetId)}</code> не найден или не может быть удалён.`, { parse_mode: 'HTML' });
+  }
+});
+
+bot.command('users', (ctx) => {
+  if (!assertAuthorized(ctx)) return;
+  const users = defaultUserStore.listUsers();
+  const list = users.map(u => `• <code>${escapeHtml(u)}</code>`).join('\n');
+  ctx.reply(`<b>👥 Авторизованные пользователи (${users.length}):</b>\n\n${list}`, { parse_mode: 'HTML' });
+});
 
 // ── Helper Utilities ──────────────────────────────────────────────────────────
 const STATUS_BADGES = {
