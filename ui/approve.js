@@ -6,6 +6,9 @@
     const headers = new Headers(init.headers || {});
     const token = sessionStorage.getItem(TOKEN_KEY);
     if (token) headers.set('Authorization', `Bearer ${token}`);
+    if (window.Telegram?.WebApp?.initData) {
+      headers.set('X-Telegram-Init-Data', window.Telegram.WebApp.initData);
+    }
     const response = await window.fetch(input, { ...init, headers });
     if (response.status === 401 && canRetry) {
       const entered = window.prompt('API token для удалённого Comic Studio:');
