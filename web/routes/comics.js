@@ -21,8 +21,9 @@ export function comicsRouter({ config, store }) {
         items.push({
           scenario_id: id,
           filename,
-          url: `/comics/${filename}`,
+          url: hasWebp ? `/comics/${id}.webp` : `/comics/${filename}`,
           url_webp: hasWebp ? `/comics/${id}.webp` : `/comics/${filename}`,
+          url_png: `/comics/${filename}`,
           created: stat.mtime.toISOString(),
         });
       } catch {}

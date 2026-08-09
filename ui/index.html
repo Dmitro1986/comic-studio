@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Comic Studio — Дашборд</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="aipult.css">
+  <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
+
 <body>
   <header>
     <h1>🎨 Comic Studio</h1>
@@ -86,22 +89,18 @@
 
       <div id="aipult-suggestions" class="aipult-suggestions">
         <small>Попробуй:</small>
-        <button class="aipult-chip" type="button" data-suggestion="поменяй стиль у кота на gothic">🎨 стиль у кота на gothic</button>
+        <button class="aipult-chip" type="button" data-suggestion="поменяй стиль у кота на gothic">🎨 стиль у кота на
+          gothic</button>
         <button class="aipult-chip" type="button" data-suggestion="покажи последние 5">📋 последние 5</button>
-        <button class="aipult-chip" type="button" data-suggestion="перерисуй последний rendered">🔄 последний rendered</button>
+        <button class="aipult-chip" type="button" data-suggestion="перерисуй последний rendered">🔄 последний
+          rendered</button>
       </div>
 
       <div id="aipult-messages" class="aipult-messages" role="log" aria-live="polite"></div>
 
       <form id="aipult-form" class="aipult-form" autocomplete="off">
-        <textarea
-          id="aipult-input"
-          class="aipult-input"
-          rows="2"
-          maxlength="1000"
-          placeholder="Например: поменяй стиль у кота на gothic…"
-          aria-label="Сообщение для AiPULT"
-        ></textarea>
+        <textarea id="aipult-input" class="aipult-input" rows="2" maxlength="1000"
+          placeholder="Например: поменяй стиль у кота на gothic…" aria-label="Сообщение для AiPULT"></textarea>
         <button type="submit" id="aipult-send" class="aipult-send-btn" title="Отправить">📤</button>
       </form>
     </section>
@@ -147,7 +146,8 @@
           <li><i>Изменить концовку</i></li>
           <li><i>Добавить персонажа</i></li>
         </ul>
-        <p>Badge <b>💬 N запросов</b> показывает сохранённую историю. Revision запускает LLM-регенерацию и снимает approval до ручного re-approval.</p>
+        <p>Badge <b>💬 N запросов</b> показывает сохранённую историю. Revision запускает LLM-регенерацию и снимает
+          approval до ручного re-approval.</p>
 
         <h3>🔐 Доступ</h3>
         <ul>
@@ -217,7 +217,7 @@
     <div class="modal-content">
       <h3>⚡️ Быстрая правка (без рендера)</h3>
       <p>ID: <code id="restyle-id"></code></p>
-      
+
       <div class="form-group">
         <label for="restyle-style">Стиль баблов:</label>
         <select id="restyle-style">
@@ -245,4 +245,5 @@
   <script src="app.js"></script>
   <script type="module" src="aipult.js"></script>
 </body>
+
 </html>
