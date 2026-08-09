@@ -75,8 +75,14 @@ def main() -> int:
             print(f"❌ {error}", file=sys.stderr)
         return 1
 
-    out_path = Path(args.out) if args.out else scenario_path
+    target_status = revised.get("status", "draft")
+    target_dir = Path("data/scenarios") / target_status
+    target_dir.mkdir(parents=True, exist_ok=True)
+    out_path = Path(args.out) if args.out else target_dir / f"{args.scenario_id}.json"
+
     out_path.write_text(json.dumps(revised, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not args.out and out_path.resolve() != scenario_path.resolve() and scenario_path.exists():
+        scenario_path.unlink(missing_ok=True)
 
     result = {
         "ok": True,
