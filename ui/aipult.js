@@ -367,6 +367,26 @@ async function onRun(cardEl, card, command) {
     appendErrorBubble(`${err.code || 'INVALID'}: ${err.message}`);
     return;
   }
+
+  // Disable buttons & show visible running state
+  const allBtns = cardEl.querySelectorAll('.aipult-card-btn');
+  const runBtn = cardEl.querySelector('.aipult-card-btn--run');
+  allBtns.forEach(b => b.disabled = true);
+  if (runBtn) {
+    runBtn.classList.add('aipult-card-btn--running');
+    runBtn.innerHTML = '⏳ В процессе...';
+  }
+
+  let busyBadge = cardEl.querySelector('.aipult-card-busy-badge');
+  if (!busyBadge) {
+    busyBadge = document.createElement('div');
+    busyBadge.className = 'aipult-card-busy-badge';
+    const meta = cardEl.querySelector('.aipult-card-meta') || cardEl.querySelector('.aipult-card-title');
+    if (meta) meta.after(busyBadge);
+    else cardEl.prepend(busyBadge);
+  }
+  busyBadge.innerHTML = '⏳ <b>Идёт выполнение / рендеринг...</b> Пожалуйста, подождите (3-15 сек)';
+
   appendSystemBubble(`▶️ Запускаю: ${truncate(command, 80)}`);
   try {
     const resp = await fetch(ENDPOINTS.execute, {
@@ -382,8 +402,31 @@ async function onRun(cardEl, card, command) {
       }),
     });
     const body = await resp.json();
-    renderResult(cardEl, body, resp.status, card);
+
+    busyBadge?.remove();
+    const isOk = resp.ok && body.ok !== false;
+
+    if (isOk) {
+      if (runBtn) {
+        runBtn.classList.remove('aipult-card-btn--running');
+        runBtn.innerHTML = '✅ Выполнено';
+      }
+    } else {
+      allBtns.forEach(b => b.disabled = false);
+      if (runBtn) {
+        runBtn.classList.remove('aipult-card-btn--running');
+        runBtn.innerHTML = '▶️ Run';
+      }
+    }
+
+    renderResult(cardEl, body, resp.status, { ...card, scenario_id: scenarioId });
   } catch (err) {
+    busyBadge?.remove();
+    allBtns.forEach(b => b.disabled = false);
+    if (runBtn) {
+      runBtn.classList.remove('aipult-card-btn--running');
+      runBtn.innerHTML = '▶️ Run';
+    }
     appendErrorBubble(`Execute failed: ${err.message}`);
   }
 }
@@ -415,11 +458,8 @@ function renderResult(cardEl, body, httpStatus, card) {
   }
 
   // Action buttons: primary "Open comic" link + secondary actions
-  // After successful restyle, user wants to SEE the comic — make HTML/PNG
-  // links prominent.
-  const scenarioId = card?.resolved_scenario?.id;
-  const scenarioStatus = card?.resolved_scenario?.status;
-  const canOpenComic = ok && scenarioId && (scenarioStatus === 'rendered' || scenarioStatus === 'published');
+  const scenarioId = card?.scenario_id || card?.resolved_scenario?.id;
+  const canOpenComic = ok && scenarioId;
 
   if (canOpenComic) {
     const openRow = document.createElement('div');
