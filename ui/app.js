@@ -508,12 +508,13 @@ async function loadComics() {
     const id = c.scenario_id || c.filename.replace(/\.png$/, '');
     const htmlUrl = `/comics/${id}.html`;
     const webpUrl = c.url_webp || `/comics/${id}.webp`;
+    const cardImgUrl = c.url_webp || c.url || `/comics/${id}.webp`;
     return `
     <div class="card comic-card">
       <a href="${htmlUrl}" target="_blank" rel="noopener">
         <picture>
           <source type="image/webp" srcset="${webpUrl}">
-          <img src="${c.url}" alt="${escapeHtml(c.filename)}" loading="lazy">
+          <img src="${cardImgUrl}" alt="${escapeHtml(c.filename)}" loading="lazy">
         </picture>
       </a>
       <div class="meta">Комикс ID: ${escapeHtml(id)}</div>
