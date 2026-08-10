@@ -117,3 +117,32 @@ test('partial staged delete rolls back already moved artifacts', async () => {
     ctx.project.cleanup();
   }
 });
+
+test('restyle allows updating captions and style for draft scenario without python script execution', async () => {
+  const ctx = makeTestRuntime();
+  writeScenario(ctx.runtime.config.dataRoot, 'draft', {
+    id: 'ops-0008',
+    style: 'bubble',
+    panels: [{ n: 1, caption: 'Старая подпись 1' }, { n: 2, caption: 'Старая подпись 2' }],
+  });
+  const server = await listen(ctx.app);
+  try {
+    const res = await jsonFetch(`${server.baseUrl}/api/scenarios/ops-0008/restyle`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ style: 'star', captions: ['Новая подпись 1', 'Новая подпись 2'] }),
+    });
+    assert.equal(res.response.status, 200);
+    assert.equal(res.body.ok, true);
+    assert.equal(res.body.style, 'star');
+    assert.equal(res.body.status, 'draft');
+
+    const updated = ctx.runtime.store.get('ops-0008').record;
+    assert.equal(updated.style, 'star');
+    assert.equal(updated.panels[0].caption, 'Новая подпись 1');
+    assert.equal(updated.panels[1].caption, 'Новая подпись 2');
+  } finally {
+    await server.close();
+    ctx.project.cleanup();
+  }
+});

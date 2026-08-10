@@ -145,33 +145,41 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
     const captions = Array.isArray(req.body?.captions) ? req.body.captions : undefined;
     
     const existing = store.get(id);
-    if (!['rendered', 'published'].includes(existing.state)) {
-      throw conflict('INVALID_STATE', 'Restyle works only for rendered or published scenarios');
+    if (!['draft', 'approved', 'rendered', 'published'].includes(existing.state)) {
+      throw conflict('INVALID_STATE', 'Restyle works only for active scenarios');
     }
     
-    if (captions) {
+    if (captions || style) {
       await store.update(id, async (record) => {
-        if (captions.length !== record.panels.length) {
-           const err = new Error('Captions length must match panels length');
-           err.code = 'INVALID_CAPTIONS';
-           throw err;
+        if (style) record.style = style;
+        if (captions) {
+          if (captions.length !== record.panels.length) {
+            const err = new Error('Captions length must match panels length');
+            err.code = 'INVALID_CAPTIONS';
+            throw err;
+          }
+          record.panels.forEach((p, i) => {
+            if (typeof captions[i] === 'string') p.caption = captions[i];
+          });
         }
-        record.panels.forEach((p, i) => {
-           if (typeof captions[i] === 'string') p.caption = captions[i];
-        });
         return record;
       });
     }
 
     const currentStyle = style || existing.record.style || 'bubble';
-    const args = ['scripts/restyle.py', '--scenario-id', id, '--style', currentStyle];
-    await runner.run(config.pythonBin, args, {
-      cwd: config.projectRoot,
-      timeoutMs: 30000,
-      outputLimit: config.processOutputLimit,
-      requestId: req.id,
-      operation: 'scenario.restyle',
-    });
+
+    // Only run python restyle script if comic has rendered image artifacts
+    if (['rendered', 'published'].includes(existing.state)) {
+      const args = ['scripts/restyle.py', '--scenario-id', id, '--style', currentStyle];
+      await runner.run(config.pythonBin, args, {
+        cwd: config.projectRoot,
+        timeoutMs: 30000,
+        outputLimit: config.processOutputLimit,
+        requestId: req.id,
+        operation: 'scenario.restyle',
+      });
+    }
+
     res.json({ ok: true, id, status: existing.state, style: currentStyle, request_id: req.id });
   }));
 

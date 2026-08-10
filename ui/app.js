@@ -326,13 +326,13 @@ function scenarioCard(sc, status, activeJobs = []) {
   
   const editBtn = isBusy
     ? `<button class="edit" disabled>⏳</button>`
-    : (status === 'approved' || status === 'rendered')
+    : (status === 'draft' || status === 'approved' || status === 'rendered')
       ? `<button class="edit" data-id="${sc.id}" data-action="edit">🔄 Revision</button>`
       : status === 'published'
         ? `<button class="edit" data-id="${sc.id}" data-action="edit">🎨 Remix</button>`
         : '';
         
-  const fastEditBtn = (status === 'rendered' || status === 'published') && !isBusy
+  const fastEditBtn = (status === 'draft' || status === 'approved' || status === 'rendered' || status === 'published') && !isBusy
     ? `<button class="restyle-btn" data-id="${sc.id}">⚡️ Быстрая правка</button>`
     : '';
     
@@ -343,6 +343,10 @@ function scenarioCard(sc, status, activeJobs = []) {
   let actions;
   if (status === 'draft') {
     actions = `
+    <div class="actions" style="margin-bottom: 0.5rem;">
+      ${fastEditBtn}
+      ${editBtn}
+    </div>
     <div class="actions">
       <button class="approve" data-id="${sc.id}" data-action="approve">✅ Утвердить</button>
       <button class="reject" data-id="${sc.id}" data-action="reject">❌ Отклонить</button>
