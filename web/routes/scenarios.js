@@ -273,7 +273,7 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
       throw conflict('INVALID_STATE', 'Only rendered scenarios can be published');
     }
     const args = ['scripts/publish_rendered.js', '--scenario-id', id];
-    await runner.run('node', args, {
+    await runner.run(process.execPath, args, {
       cwd: config.projectRoot,
       timeoutMs: 60000,
       outputLimit: config.processOutputLimit,

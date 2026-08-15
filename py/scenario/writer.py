@@ -38,6 +38,7 @@ SYSTEM_PROMPT = """Ты креативный сценарист коротких
 - **ПОДПИСИ (captions) — ТОЛЬКО НА РУССКОМ ЯЗЫКЕ.** Краткие, дерзкие, ≤6 слов.
 - Стиль подписей: по умолчанию 'star' (взрыв-POW!), можно 'bubble', 'gothic', 'boom', 'memo', 'bar'.
 - Если контекст серьёзный — tone='epic'. Если юмор — tone='funny'. Если обучение — tone='educational'.
+- Персонажи должны быть описаны детально (внешность, одежда, отличительные черты) — это КЛЮЧ к консистентности между панелями.
 - Верни СТРОГО JSON без markdown-обёртки.
 
 Формат ответа:
@@ -47,8 +48,11 @@ SYSTEM_PROMPT = """Ты креативный сценарист коротких
   "style": "star|bubble|gothic|boom|memo|bar",
   "layout": "comic|grid",
   "aspect_ratio": "16:9",
+  "characters": [
+    {"name": "Имя персонажа", "appearance": "детальное описание внешности", "mannerisms": "отличительные жесты, мимика, голос"}
+  ],
   "panels": [
-    {"n": 1, "prompt": "детальное визуальное описание сцены на английском, ≤1500 chars", "caption": "подпись на РУССКОМ, ≤6 слов"},
+    {"n": 1, "prompt": "детальное визуальное описание сцены на английском, ≤1500 chars. В начале: CHARACTERS: <имя>: <описание внешности>. Персонажей указывать по именам.", "caption": "подпись на РУССКОМ, ≤6 слов"},
     {"n": 2, "prompt": "...", "caption": "..."},
     {"n": 3, "prompt": "...", "caption": "..."}
   ]
@@ -109,9 +113,10 @@ ACCEPTED_PANEL_COUNTS = (3, 4)
 REVISION_SYSTEM_PROMPT = """Ты редактор комикс-сценария, который обновляет существующий JSON-сценарий, применяя отзыв автора.
 
 ПРАВИЛА:
-- Сохрани все ранее зафиксированные метаданные: title, tone, style, image_style, layout, aspect_ratio, seed.
+- Сохрани все ранее зафиксированные метаданные: title, tone, style, image_style, layout, aspect_ratio, seed, characters.
 - Допускается 3 или 4 панели; используй количество панелей, ближайшее к прежнему, если в feedback не указано иное.
 - Каждая панель: prompt ≤1500 символов, caption ≤6 слов, только на русском.
+- Персонажи (если есть) должны сохраняться и их описания могут обновляться для лучшей консистентности.
 - Не добавляй markdown-обёртку; верни только валидный JSON.
 - Учитывай source context, исходные panels и всю feedback history; не игнорируй явные замечания автора.
 - Не повторяй panels без необходимости; изменяй только то, что вытекает из feedback.
@@ -123,8 +128,11 @@ REVISION_SYSTEM_PROMPT = """Ты редактор комикс-сценария,
   "style": "star|bubble|gothic|boom|memo|bar",
   "layout": "comic|grid",
   "aspect_ratio": "16:9",
+  "characters": [
+    {"name": "Имя", "appearance": "описание", "mannerisms": "жесты"}
+  ],
   "panels": [
-    {"n": 1, "prompt": "≤1500 chars", "caption": "≤6 слов на русском"},
+    {"n": 1, "prompt": "≤1500 chars. CHARACTERS: <имя>: <описание>.", "caption": "≤6 слов на русском"},
     ...
   ]
 }
@@ -180,12 +188,29 @@ def generate_scenario(
     scenario.setdefault("image_style", image_style or "comic")
     scenario.setdefault("layout", "comic")
     scenario.setdefault("aspect_ratio", "16:9")
+    scenario.setdefault("characters", [])
 
-    # Добавляем стиль к промптам панелей
+    # Собираем CHARACTERS строку для промптов
+    characters_list = scenario.get("characters", [])
+    if characters_list:
+        char_parts = []
+        for c in characters_list:
+            name = c.get("name", "Character")
+            appearance = c.get("appearance", "")
+            mannerisms = c.get("mannerisms", "")
+            char_str = f"{name}: {appearance}"
+            if mannerisms:
+                char_str += f", {mannerisms}"
+            char_parts.append(char_str)
+        characters_str = "CHARACTERS: " + "; ".join(char_parts) + ". "
+    else:
+        characters_str = ""
+
+    # Добавляем стиль и персонажей к промптам панелей
     style_suffix = STYLE_TEMPLATES.get(scenario["image_style"], STYLE_TEMPLATES["comic"])
     for panel in scenario.get("panels", []):
         if "prompt" in panel:
-            panel["prompt"] = f"{panel['prompt']}, {style_suffix}"
+            panel["prompt"] = f"{characters_str}{panel['prompt']}, {style_suffix}"
 
     # Проверка структуры
     if not isinstance(scenario.get("panels"), list) or not scenario["panels"]:
@@ -281,6 +306,7 @@ def revise_scenario(
         f"image_style={image_style}\n"
         f"layout={current_scenario.get('layout', 'comic')}\n"
         f"aspect_ratio={current_scenario.get('aspect_ratio', '16:9')}\n"
+        f"characters={json.dumps(current_scenario.get('characters', []), ensure_ascii=False)}\n"
         f"panels={panels_summary}\n\n"
         f"История правок автора:\n{formatted_feedback}\n\n"
         f"Примени ВСЕ отзывы и верни revised JSON."
@@ -307,11 +333,31 @@ def revise_scenario(
     revised.setdefault("image_style", image_style)
     revised.setdefault("layout", current_scenario.get("layout", "comic"))
     revised.setdefault("aspect_ratio", current_scenario.get("aspect_ratio", "16:9"))
+    revised.setdefault("characters", current_scenario.get("characters", []))
+
+    # Инъекция персонажей в промты
+    characters_list = revised.get("characters", [])
+    if characters_list:
+        char_parts = []
+        for c in characters_list:
+            name = c.get("name", "Character")
+            appearance = c.get("appearance", "")
+            mannerisms = c.get("mannerisms", "")
+            char_str = f"{name}: {appearance}"
+            if mannerisms:
+                char_str += f", {mannerisms}"
+            char_parts.append(char_str)
+        characters_str = "CHARACTERS: " + "; ".join(char_parts) + ". "
+    else:
+        characters_str = ""
 
     style_suffix = STYLE_TEMPLATES.get(revised["image_style"], STYLE_TEMPLATES["comic"])
     for panel in revised["panels"]:
-        if "prompt" in panel and style_suffix not in panel["prompt"]:
-            panel["prompt"] = f"{panel['prompt']}, {style_suffix}"
+        if "prompt" in panel:
+            prompt = panel["prompt"]
+            # Избегаем дублирования CHARACTERS
+            if "CHARACTERS:" not in prompt:
+                panel["prompt"] = f"{characters_str}{prompt}, {style_suffix}"
 
     revised["id"] = current_scenario["id"]
     revised["status"] = "draft"
