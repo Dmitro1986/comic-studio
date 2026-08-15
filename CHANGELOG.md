@@ -79,6 +79,10 @@
 - `2026-08-09T06:04:00Z` — Исправлены вызовы AiPULT execute, реконсиляция ScenarioStore и загрузка обложек в WebP: в `py/scenario/writer.py` добавлен тримминг подписей при ревизии до 6 слов (устранена ошибка 502/exit-1); в `web/lib/scenario_store.js` внедрен механизм Self-Healing Reconciliation и обновлены пути сохранения в `scripts/revise_scenario.py` (восстановлены все ранее пропадавшие сценарии); в `web/routes/comics.js` и `ui/app.js` подложки карточек переведены на формат `.webp` для максимальной скорости отображения в браузере. Все 115 тестов Node.js и 75 тестов Python проходят.
 - `2026-08-10T11:33:00Z` — Выведены кнопки «🔄 Revision» и «⚡️ Быстрая правка» на карточках сценариев в статусах draft и approved в Web UI. Расширен эндпоинт `POST /api/scenarios/:id/restyle` для поддержки редактирования подписей панелей и визуального стиля баблов на этапе черновиков без вызова Python restyle process. Добавлен юнит-тест в `web/tests/operations.test.js` (все 119 тестов Web API успешно проходят). OpenSpec change заархивирован в `openspec/changes/archive/2026-08-10-draft-card-actions/`.
 
+## 2026-08-15
+
+- `2026-08-15T12:20:00+03:00` — Добавлен endpoint `GET /api/scenarios/:id/preview` для быстрого HTML-превью сценария без вызова MiniMax; кнопка «👁 Превью» на карточках draft в Web UI открывает превью в новой вкладке.
+
 
 
 

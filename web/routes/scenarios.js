@@ -107,6 +107,62 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
     res.json({ ok: true, id, seed: result.record.seed, request_id: req.id });
   }));
 
+  // HTML preview — fast, no MiniMax call, shows panel structure + captions
+  router.get('/:id/preview', asyncRoute(async (req, res) => {
+    const id = validate.scenarioId(req.params.id);
+    const candidate = lifecycle.store.find(id);
+    if (!candidate) throw notFound('SCENARIO_NOT_FOUND', `Scenario ${id} not found`);
+    const scenario = candidate.record;
+    const panels = scenario.panels || [];
+
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const title = scenario.title || 'Без названия';
+    const style = scenario.style || 'star';
+    const imageStyle = scenario.image_style || 'comic';
+    const tone = scenario.tone || 'epic';
+
+    // Build simple HTML preview with panel structure and captions
+    const panelsHtml = panels.map((p, i) => {
+      const n = p.n || (i + 1);
+      const caption = esc(p.caption || '');
+      return `
+      <div class="panel">
+        <div class="panel-number">Панель ${n}</div>
+        <div class="panel-placeholder">⏳ Ожидает рендера</div>
+        <div class="panel-caption">${caption}</div>
+      </div>`;
+    }).join('\n');
+
+    const html = `<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Превью: ${esc(title)}</title>
+  <style>
+    body { font-family: sans-serif; background: #1a1a2e; color: #eee; padding: 2rem; }
+    h1 { color: #ffd700; margin-bottom: 0.5rem; }
+    .meta { color: #888; margin-bottom: 2rem; }
+    .preview-badge { background: #ff6b35; color: white; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.85rem; display: inline-block; margin-bottom: 1.5rem; }
+    .panels { display: flex; flex-direction: column; gap: 1.5rem; max-width: 800px; margin: 0 auto; }
+    .panel { background: #16213e; border-radius: 8px; padding: 1rem; border: 1px solid #0f3460; }
+    .panel-number { color: #e94560; font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .panel-placeholder { background: #0f3460; border-radius: 4px; height: 120px; display: flex; align-items: center; justify-content: center; color: #555; margin-bottom: 0.75rem; }
+    .panel-caption { color: #ffd700; font-size: 1.1rem; text-align: center; padding: 0.5rem; background: #0f3460; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>${esc(title)}</h1>
+  <div class="meta">Стиль: ${esc(style)} · Рисунок: ${esc(imageStyle)} · Тон: ${esc(tone)}</div>
+  <div class="preview-badge">⚡ Превью — без рендера</div>
+  <div class="panels">${panelsHtml}</div>
+</body>
+</html>`;
+
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  }));
+
   router.post('/:id/feedback', asyncRoute(async (req, res) => {
     const id = validate.scenarioId(req.params.id);
     await lifecycle.recordFeedback(id, req.body?.text || '');

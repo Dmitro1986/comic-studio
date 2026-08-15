@@ -340,10 +340,15 @@ function scenarioCard(sc, status, activeJobs = []) {
     ? `<button class="publish" data-id="${sc.id}" data-action="publish">🚀 Опубликовать</button>`
     : '';
 
+  const previewBtn = status === 'draft'
+    ? `<button class="preview" data-id="${sc.id}">👁 Превью</button>`
+    : '';
+
   let actions;
   if (status === 'draft') {
     actions = `
     <div class="actions" style="margin-bottom: 0.5rem;">
+      ${previewBtn}
       ${fastEditBtn}
       ${editBtn}
     </div>
@@ -474,6 +479,14 @@ function attachHandlers(status) {
       });
     });
   }
+
+  // Preview button — opens HTML preview in new tab
+  document.querySelectorAll(`#${status}-list .actions button.preview`).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      window.open(`/api/scenarios/${id}/preview`, '_blank');
+    });
+  });
 
   // Status transition buttons (approve, reject, publish)
   document.querySelectorAll(`#${status}-list .actions button.approve, #${status}-list .actions button.reject, #${status}-list .actions button.publish`).forEach(btn => {
