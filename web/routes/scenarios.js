@@ -285,5 +285,31 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
     res.json({ ok: true, id, status: updated.state, request_id: req.id });
   }));
 
+
+
+  // POST /api/scenarios/:id/unpublish — вернуть в rendered (снять с публикации)
+  router.post('/:id/unpublish', asyncRoute(async (req, res) => {
+    const id = validate.scenarioId(req.params.id);
+    const existing = store.get(id);
+    
+    if (existing.state !== 'published') {
+      throw conflict('INVALID_STATE', 'Only published scenarios can be unpublished');
+    }
+    
+    // Transition the state using the store to ensure data consistency
+    await store.transition(id, 'published', 'rendered');
+    
+    // Remove comic HTML/webp artifacts
+    const htmlPath = path.join(config.dataRoot, 'comics', `${id}.html`);
+    const webpPath = path.join(config.dataRoot, 'comics', `${id}.webp`);
+    
+    await Promise.all([
+      require('fs').promises.unlink(htmlPath).catch(() => {}),
+      require('fs').promises.unlink(webpPath).catch(() => {}),
+    ]);
+    
+    res.json({ ok: true, id, status: 'rendered', request_id: req.id });
+  }));
+
   return router;
 }
