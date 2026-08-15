@@ -14,7 +14,7 @@ module.exports = {
   apps: [
     {
       name: 'comic-web',
-      cwd: './web',
+      cwd: '.',
       script: 'server.js',
       instances: 1,
       autorestart: true,
