@@ -143,10 +143,20 @@ export class ScenarioStore {
     if (candidates.length > 1) {
       const distinctStates = new Set(candidates.map(item => item.state));
       if (distinctStates.size > 1) {
-        this.logger?.error('scenario.find.duplicate_states', { scenario_id: id, states: [...distinctStates] });
-        throw conflict('SCENARIO_STATE_CONFLICT', 'Duplicate scenario ID across lifecycle queues', { id, states: [...distinctStates] });
+        const draft = candidates.find(c => c.state === 'draft');
+        const stale = candidates.find(c => c.state !== 'draft' && c.record.revision_status === 'revision_queued');
+        
+        if (draft && stale) {
+          this.logger?.warn('scenario.find.stale_duplicate_healed', { scenario_id: id, stale_state: stale.state });
+          fs.unlinkSync(stale.path);
+          candidates = [draft];
+        } else {
+          this.logger?.error('scenario.find.duplicate_states', { scenario_id: id, states: [...distinctStates] });
+          throw conflict('SCENARIO_STATE_CONFLICT', 'Duplicate scenario ID across lifecycle queues', { id, states: [...distinctStates] });
+        }
+      } else {
+        this.logger?.warn('scenario.find.duplicates', { scenario_id: id, count: candidates.length });
       }
-      this.logger?.warn('scenario.find.duplicates', { scenario_id: id, count: candidates.length });
     }
     const candidate = candidates[0];
     if (candidate.record._transition) return reconcile ? this.reconcileOne(candidate) : candidate;
@@ -398,16 +408,20 @@ export class ScenarioStore {
           const needsRevoke = candidate.record.revision_status === 'revision_queued' && state !== 'draft';
           if (candidate.record._transition || candidate.record.status !== state || needsRevoke) {
             if (needsRevoke) {
-              const next = {
-                ...candidate.record,
-                status: 'draft',
-                revision_status: 'revision_idle',
-              };
-              delete next._transition;
               const destination = this.scenarioPath('draft', id);
-              if (fs.existsSync(destination)) throw conflict('DESTINATION_EXISTS', 'Draft destination already exists during reconcile');
-              atomicWriteJson(destination, next);
-              fs.unlinkSync(candidate.path);
+              if (fs.existsSync(destination)) {
+                this.logger?.warn('scenario.reconcile.stale_revoke_cleanup', { scenario_id: id });
+                fs.unlinkSync(candidate.path);
+              } else {
+                const next = {
+                  ...candidate.record,
+                  status: 'draft',
+                  revision_status: 'revision_idle',
+                };
+                delete next._transition;
+                atomicWriteJson(destination, next);
+                fs.unlinkSync(candidate.path);
+              }
             } else {
               this.reconcileOne(candidate);
             }
