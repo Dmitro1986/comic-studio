@@ -1,6 +1,8 @@
 # Таска: Публичная галерея опубликованных комиксов
 
-## Статус: Pending
+## Статус: ✅ Done
+
+## Дата фиксации: 2026-08-15
 
 ## Описание
 
@@ -17,6 +19,10 @@
 | 5 | Responsive дизайн (мобильные) | medium |
 | 6 | SEO meta tags, open graph | low |
 
-## Примечание
+## Что сделано
 
-Комиксы уже доступны по URL вида `comic.openaiua.fr/comics/<id>.html`. Нужна обёртка-галерея.
+- Создан `/ui/gallery.html` — публичная страница-галерея
+- Добавлен route `/gallery` в `web/app.js`
+- Расширен endpoint `GET /api/comics`: добавлены title, style, panels_count, url_html, created
+- Исправлен баг: `store.find()` возвращает `{ state, path, record }`, не сам record
+- URL: https://comic.openaiua.fr/gallery

@@ -18,13 +18,19 @@ export function comicsRouter({ config, store }) {
         const filePath = safeResolve(comicsRoot, filename);
         const stat = fs.statSync(filePath);
         const hasWebp = fs.existsSync(safeResolve(comicsRoot, `${id}.webp`));
+        const rec = candidate.record;
         items.push({
           scenario_id: id,
           filename,
+          title: rec?.title || id,
+          style: rec?.style || 'comic',
+          image_style: rec?.image_style || 'comic',
+          panels_count: Array.isArray(rec?.panels) ? rec.panels.length : 0,
           url: hasWebp ? `/comics/${id}.webp` : `/comics/${filename}`,
           url_webp: hasWebp ? `/comics/${id}.webp` : `/comics/${filename}`,
           url_png: `/comics/${filename}`,
-          created: stat.mtime.toISOString(),
+          url_html: `/comics/${id}.html`,
+          created: rec?.created_at || stat.mtime.toISOString(),
         });
       } catch {}
     }

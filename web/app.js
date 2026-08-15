@@ -61,6 +61,10 @@ export function createApp(runtime, { idGenerator } = {}) {
   // server-only modules (process_runner, lifecycle, scenario_store, etc.).
   // Use absolute path because server may run from /web/ cwd (npm run dev).
   app.use('/web/lib/aipult', express.static(path.resolve(config.projectRoot, 'web/lib/aipult'), { fallthrough: true, index: false, maxAge: '1h' }));
+  // Gallery — public page listing all published comics
+  app.get('/gallery', (req, res) => {
+    res.sendFile(path.resolve(config.uiRoot, 'gallery.html'));
+  });
   app.use(htmlStaticRouter({ config }));
   app.get('/comics/:filename', (req, res, next) => {
     try {

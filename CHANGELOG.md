@@ -84,6 +84,7 @@
 - `2026-08-15T12:20:00+03:00` — Добавлен endpoint `GET /api/scenarios/:id/preview` для быстрого HTML-превью сценария без вызова MiniMax; кнопка «👁 Превью» на карточках draft в Web UI.
 - `2026-08-15T13:10:00+03:00` — Добавлена поддержка `characters[]` в `writer.py`: LLM генерирует профили персонажей (name, appearance, mannerisms) при создании сценария; CHARACTERS-блок инъецируется в начало каждого panel prompt для улучшения консистентности персонажей между панелями. Поддержка revise.
 - `2026-08-15T13:15:00+03:00` — Исправлен баг публикации через Web UI: заменён `runner.run('node', ...)` на `runner.run(process.execPath, ...)` — PM2 не наследует PATH, `node` без абсолютного пути не находился.
+- `2026-08-15T13:30:00+03:00` — Создана публичная галерея `/gallery` со сеткой опубликованных комиксов; расширен `GET /api/comics` (title, style, panels_count, url_html, created); исправлен `store.find()` — возвращает `{state, path, record}`, не record напрямую.
 
 
 
