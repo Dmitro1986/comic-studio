@@ -73,6 +73,56 @@ document.getElementById('delete-modal')?.addEventListener('click', (e) => {
   if (e.target.id === 'delete-modal') closeDeleteModal();
 });
 
+// Unpublish Modal Logic
+let currentUnpublishId = null;
+let currentUnpublishBtn = null;
+
+function openUnpublishModal(id, btn) {
+  currentUnpublishId = id;
+  currentUnpublishBtn = btn;
+  document.getElementById('unpublish-id').textContent = id;
+  document.getElementById('unpublish-modal').classList.remove('hidden');
+}
+
+function closeUnpublishModal() {
+  currentUnpublishId = null;
+  currentUnpublishBtn = null;
+  document.getElementById('unpublish-modal').classList.add('hidden');
+}
+
+document.getElementById('unpublish-cancel')?.addEventListener('click', closeUnpublishModal);
+document.getElementById('unpublish-confirm')?.addEventListener('click', async () => {
+  if (!currentUnpublishId || !currentUnpublishBtn) return;
+  const btn = currentUnpublishBtn;
+  const confirmBtn = document.getElementById('unpublish-confirm');
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = '⏳ Загрузка...';
+  
+  try {
+    const res = await apiFetch(`/api/scenarios/${currentUnpublishId}/unpublish`, { method: 'POST' });
+    const result = await res.json();
+    if (result.ok) {
+      btn.textContent = '↩️';
+      closeUnpublishModal();
+      const activeTab = document.querySelector('nav button.active').dataset.tab;
+      setTimeout(() => loadTab(activeTab), 500);
+    } else {
+      confirmBtn.textContent = 'Ошибка';
+      alert(`Ошибка: ${result.error?.message || 'Неизвестная ошибка'}`);
+    }
+  } catch (e) {
+    confirmBtn.textContent = 'Ошибка';
+    alert(`Ошибка сети: ${e.message}`);
+  } finally {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = '↩️ Снять с публикации';
+  }
+});
+
+document.getElementById('unpublish-modal')?.addEventListener('click', (e) => {
+  if (e.target.id === 'unpublish-modal') closeUnpublishModal();
+});
+
 function openEditModal(id) {
   currentEditId = id;
   document.getElementById('edit-id').textContent = id;
@@ -370,14 +420,11 @@ function scenarioCard(sc, status, activeJobs = []) {
       <button class="delete" data-id="${sc.id}" data-action="delete">🗑 Удалить</button>
     </div>`;
   } else {
-    const topActions = fastEditBtn 
-      ? `<div class="actions" style="margin-bottom: 0.5rem;">${fastEditBtn}</div>` 
-      : '';
+    // published — кнопка "Вернуть в Готовые" для админа
     actions = `
-    ${topActions}
     <div class="actions">
-      ${editBtn}
-      <span class="tag">🔒 Только чтение</span>
+      <button class="unpublish" data-id="${sc.id}" data-action="unpublish">↩️ Вернуть в Готовые</button>
+      <span class="tag">🔒 Опубликовано</span>
     </div>`;
   }
   // HTML/PNG ссылки для rendered и published (только когда есть артефакт)
@@ -509,6 +556,14 @@ function attachHandlers(status) {
         btn.textContent = 'Ошибка';
         alert(`Ошибка сети: ${e.message}`);
       }
+    });
+  });
+
+  // Unpublish button
+  document.querySelectorAll(`#${status}-list .actions button.unpublish`).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.id;
+      openUnpublishModal(id, btn);
     });
   });
 }

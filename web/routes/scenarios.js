@@ -299,15 +299,6 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
     // Transition the state using the store to ensure data consistency
     await store.transition(id, 'published', 'rendered');
     
-    // Remove comic HTML/webp artifacts
-    const htmlPath = path.join(config.dataRoot, 'comics', `${id}.html`);
-    const webpPath = path.join(config.dataRoot, 'comics', `${id}.webp`);
-    
-    await Promise.all([
-      require('fs').promises.unlink(htmlPath).catch(() => {}),
-      require('fs').promises.unlink(webpPath).catch(() => {}),
-    ]);
-    
     res.json({ ok: true, id, status: 'rendered', request_id: req.id });
   }));
 

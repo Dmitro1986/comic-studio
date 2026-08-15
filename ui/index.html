@@ -18,7 +18,8 @@
       <button data-tab="draft" class="active">Черновики</button>
       <button data-tab="approved">Утверждённые</button>
       <button data-tab="rendered">Готовые</button>
-      <button data-tab="comics">Комиксы</button>
+      <button data-tab="published">Опубликованные</button>
+      <button data-tab="comics">Галерея</button>
       <button data-tab="aipult">🤖 AiPULT</button>
       <button data-tab="help">ℹ️ Помощь</button>
     </nav>
@@ -69,8 +70,13 @@
     </section>
 
     <section id="tab-rendered" class="tab-content">
-      <h2>🎬 Готовые (рендер завершён)</h2>
-      <div id="rendered-list" class="grid"></div>
+      <h2>🎬 Готовые (отрендеренные)</h2>
+      <div id="rendered-list" class="card-list"></div>
+    </section>
+
+    <section id="tab-published" class="tab-content">
+      <h2>🚀 Опубликованные</h2>
+      <div id="published-list" class="card-list"></div>
     </section>
 
     <section id="tab-comics" class="tab-content">
@@ -185,6 +191,19 @@
       <div class="modal-actions">
         <button id="delete-cancel">Отмена</button>
         <button id="delete-confirm">🗑 Удалить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unpublish Confirm Modal -->
+  <div id="unpublish-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>↩️ Снять с публикации?</h3>
+      <p>Сценарий: <code id="unpublish-id"></code></p>
+      <p>Комикс вернётся в раздел «Готовые», а сгенерированные файлы HTML/WebP будут удалены.</p>
+      <div class="modal-actions">
+        <button id="unpublish-cancel">Отмена</button>
+        <button id="unpublish-confirm">↩️ Снять с публикации</button>
       </div>
     </div>
   </div>
