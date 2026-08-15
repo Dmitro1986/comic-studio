@@ -325,7 +325,7 @@ class ComicStudioMcpServer {
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error("Comic Studio MCP server running on stdio");
+    // Keep the process alive — stdio transport maintains the event loop
   }
 }
 
