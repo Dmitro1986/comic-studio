@@ -1,8 +1,6 @@
 # Virtual environments
 .venv/
 .venv
-venv/
-venv
 
 # Python
 __pycache__/
@@ -34,20 +32,24 @@ data/logs/*.log
 # Draft scenarios (don't commit drafts)
 data/scenarios/draft/*
 data/scenarios/approved/*
-data/scenarios/rejected/*
+data/scenarios/rejected/
 data/scenarios/rendered/*
 data/scenarios/published/*
 
 # Runtime jobs and source artifacts
 data/jobs/*
-data/archive/*
 data/.staging/*
-data/.cache/*
 data/.trash/*
 data/freeform/*
 
+data/comics/*.webp
+data/.cache/images/*
+
 # Comics output
-data/comics/*
+data/comics/**/*.png
+data/comics/**/*.json
+data/comics/**/*.html
+data/comics/*/
 
 # Keep directories structure
 !data/scenarios/draft/.gitkeep
@@ -67,6 +69,3 @@ skills/cache/
 # OS
 .DS_Store
 Thumbs.db
-
-# Local scripts
-tg-bot/run.sh
