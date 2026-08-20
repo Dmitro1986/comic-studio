@@ -69,3 +69,6 @@ skills/cache/
 # OS
 .DS_Store
 Thumbs.db
+
+# Telegram bot whitelist (PII)
+data/allowed_users.json
