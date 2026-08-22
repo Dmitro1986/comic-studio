@@ -72,3 +72,7 @@ Thumbs.db
 
 # Telegram bot whitelist (PII)
 data/allowed_users.json
+
+# baoyu-output PNG artifacts (regenerable)
+baoyu-output/*/comics/*.png
+web/public/baoyu-pyat-dney/

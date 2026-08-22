@@ -99,3 +99,7 @@
 ## 2026-08-20
 
 - `2026-08-20T11:00:00+00:00` — Диагностика и декомиссия Telegram-бота (`@oraclecomic_bot`): PM2 cluster mode не запускал Telegraf long-poll, файл `data/allowed_users.json` отсутствовал, доступ блокировался. Создан `data/allowed_users.json` с ID владельца, добавлен debug-лог в `assertAuthorized()`, бот остановлен. Управление сценариями/комиксами полностью покрывается через Hermes MCP (stdio). Экономия ~70 MB RSS. Аудит: `summary/audit/034_tg_bot_decommission.md`.
+
+## 2026-08-22
+
+- `2026-08-22T08:50:00+00:00` — Эксперимент: создание knowledge comic «П'ять днів» в стиле S.T.A.L.K.E.R. через Comic Studio MCP. 5 сценариев созданы/утверждены/отрендерены (id: db0e28a4, 321209b4, 405c27de, 7940b078, 58e3c5a7). 2 перерендера через `/api/scenarios/:id/revise` (MiniMax LLM переосмыслил сюжет в обоих случаях, исправлено фидбэком). HTML-книга собрана вручную (`data/comics/baoyu-pyat-dney-book.html`, 12 KB, доступна на `https://comic.openaiua.fr/comics/baoyu-pyat-dney-book.html`). По запросу пользователя удалена страница про Одессу (distant narrator) и средняя панель страницы 3 (с подросшей девочкой). Найденные особенности MiniMax: подписи не подчиняются явным инструкциям (генерируются LLM), возраст персонажа плавает через серию панелей, web job runner таймаутит на длинных рендерах (fallback: `python3 scripts/render_approved.py`). Аудит: `summary/audit/035_baoyu_pyat_dney.md`.

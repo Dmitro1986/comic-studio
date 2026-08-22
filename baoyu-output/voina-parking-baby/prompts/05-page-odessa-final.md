@@ -1,0 +1,8 @@
+# Page 05: Финал. Рассказчица. Одесса.
+
+## Visual Style
+Art: realistic | Tone: dramatic | Layout: cinematic single full-page panel
+
+## Generation Prompt
+
+S.T.A.L.K.E.R. visual style. Vertical 2:3 cinematic full-page single panel. Odesa seafront at sunset. A woman in her early forties sits alone on a weathered wooden bench facing the Black Sea. The bench has a coat of peeling green paint. Next to her on the bench, an open laptop (or a smartphone propped up) showing a photograph: the same newborn we have followed through the comic, now in morning sunlight, being held by the mother — the previous page's image reflected back. The sea is calm, golden from the sunset, a few gulls in the air, the Odesa port cranes silhouetted in the far distance. The woman's face is lit from the side by the setting sun — we can see her reflection in the laptop screen, watching the photo. The bench next to her is empty — there is a deliberate gap, a missing presence. The contrast between the peaceful sea and the war-shaken Kyiv she is looking at through the photo is the entire emotional weight. Large handwritten Cyrillic text at the bottom of the page: "Я кожен раз намагаюсь осягнути, що відчуває маленька дитина. Ми, дорослі, якось звикли. Хоча звісно боїмося." Photorealistic textures: wood grain of the bench, peeling paint, sea surface, fabric of her clothes, screen glow on her face. Color palette: warm sunset oranges, calm sea blue-grey, the bench's faded green, the photo on the screen has the same ochre/rust palette as the previous pages. Grain, soft cinematic lens flare from the sun. Mood: contemplation, distance, the privilege and curse of adult numbness. Aspect ratio 2:3 portrait.
