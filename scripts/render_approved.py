@@ -17,9 +17,20 @@ from py.lib.config import comics_dir, data_dir, scenarios_dir
 from py.lib.lifecycle import mark_rendered, update_in_place, validate_approved
 from py.lib.logging_setup import setup
 from py.render.comic_assembler import assemble_comic
-from py.render.minimax_client import generate_image
+from py.render.draw_things_client import generate_image as draw_things_generate
+from py.render.minimax_client import generate_image as minimax_generate
 
 logger = setup("scripts.render_approved")
+
+
+def _select_provider(name: str):
+    """Возвращает callable generate_image для провайдера."""
+    name = (name or "minimax").lower()
+    if name in ("minimax", "minimax-image-01"):
+        return minimax_generate
+    if name in ("draw-things", "drawthings", "draw_things"):
+        return draw_things_generate
+    raise ValueError(f"Unknown provider: {name}")
 
 
 def _load_for_mode(scenario_id: str, mode: str) -> dict | None:
@@ -47,6 +58,7 @@ def _generate_candidate(
     *,
     mode: str,
     seed: int | None,
+    provider: str = "minimax",
 ) -> tuple[Path, list[Path]]:
     sid = scenario["id"]
     panels = scenario.get("panels")
@@ -54,6 +66,9 @@ def _generate_candidate(
         raise ValueError(f"{sid}: scenario has no panels")
     panel_root.mkdir(parents=True, exist_ok=True)
     final_path.parent.mkdir(parents=True, exist_ok=True)
+
+    generate = _select_provider(provider)
+    logger.info(f"Using provider: {provider}")
 
     def render_panel(panel: dict) -> tuple[int, Path]:
         panel_path = panel_root / f"panel_{panel['n']}.png"
@@ -63,7 +78,7 @@ def _generate_candidate(
             return panel["n"], panel_path
         if mode == "initial" and validate_approved(sid) is None:
             raise RuntimeError(f"{sid}: approval gate failed immediately before provider request")
-        generate_image(
+        generate(
             prompt=panel["prompt"],
             output_path=panel_path,
             aspect_ratio=scenario.get("aspect_ratio", "16:9"),
@@ -72,11 +87,20 @@ def _generate_candidate(
         _verify_png(panel_path)
         return panel["n"], panel_path
 
-    with ThreadPoolExecutor(max_workers=min(4, len(panels))) as executor:
-        futures = [executor.submit(render_panel, panel) for panel in panels]
-        for future in as_completed(futures):
-            number, _ = future.result()
-            logger.info(f"Panel {number} rendered")
+    # Draw Things — single-job backend: только sequential
+    # MiniMax — параллельно (быстрее)
+    use_parallel = provider == "minimax"
+
+    if use_parallel:
+        with ThreadPoolExecutor(max_workers=min(4, len(panels))) as executor:
+            futures = [executor.submit(render_panel, panel) for panel in panels]
+            for future in as_completed(futures):
+                number, _ = future.result()
+                logger.info(f"Panel {number} rendered")
+    else:
+        for panel in panels:
+            number, _ = render_panel(panel)
+            logger.info(f"Panel {number} rendered (sequential)")
 
     panel_paths = [panel_root / f"panel_{panel['n']}.png" for panel in panels]
     for panel_path in panel_paths:
@@ -163,6 +187,7 @@ def render_one(
     mode: str = "initial",
     staging_root: Path | None = None,
     seed_override: int | None = None,
+    provider: str = "minimax",
 ) -> tuple[Path, int]:
     sid = scenario["id"]
     seed = seed_override if seed_override is not None else scenario.get("seed")
@@ -176,6 +201,7 @@ def render_one(
             comics_dir() / f"{sid}.png",
             mode=mode,
             seed=seed,
+            provider=provider,
         )
         raw_dir = comics_dir() / "raw"
         raw_dir.mkdir(parents=True, exist_ok=True)
@@ -199,6 +225,7 @@ def render_one(
         candidate_root / f"{sid}.png",
         mode=mode,
         seed=seed,
+        provider=provider,
     )
     return _promote_rerender(scenario, candidate_final, candidate_root / sid, staging_root, seed)
 
@@ -225,6 +252,12 @@ def main() -> int:
     parser.add_argument("--rerender", action="store_true", help="Явный rerender scenario в rendered")
     parser.add_argument("--staging-dir", help="Job-specific directory внутри data/.staging")
     parser.add_argument("--seed", type=int, help="Seed override для explicit render/rerender")
+    parser.add_argument(
+        "--provider",
+        choices=["minimax", "draw-things"],
+        default="minimax",
+        help="Image generation provider (default: minimax)",
+    )
     parser.add_argument("--json-result", action="store_true", help="Вывести machine-readable result последней строкой")
     args = parser.parse_args()
 
@@ -272,6 +305,7 @@ def main() -> int:
                 mode=mode,
                 staging_root=scenario_staging,
                 seed_override=args.seed,
+                provider=args.provider,
             )
             rendered.append({"id": sid, "comic_path": str(final), "render_revision": revision})
             logger.info(f"✅ {sid} rendered successfully")

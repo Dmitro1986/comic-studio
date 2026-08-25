@@ -76,3 +76,6 @@ data/allowed_users.json
 # baoyu-output PNG artifacts (regenerable)
 baoyu-output/*/comics/*.png
 web/public/baoyu-pyat-dney/
+
+# Draw Things MCP - symlink to comic-server node_modules
+mcp-server/draw-things/node_modules
