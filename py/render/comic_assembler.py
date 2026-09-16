@@ -97,7 +97,7 @@ def assemble_comic(
     panel_paths: list[Path | str],
     captions: list[str],
     output_path: Path | str,
-    style: str = "star",
+    style: str = "bubble",
     layout: str = "comic",
     cols: int = 2,
     *,
@@ -268,7 +268,7 @@ if __name__ == "__main__":
     print(
         assemble_comic(
             panels, caps, out,
-            sc.get("style", "star"),
+            sc.get("style", "bubble"),
             sc.get("layout", "comic"),
             scenario=sc,
         )

@@ -167,7 +167,7 @@ function formatScenarioCard(sc, status) {
   text += `<b>«${escapeHtml(sc.title || 'Без названия')}»</b>\n\n`;
   text += `🏷 <b>Статус:</b> ${badge}\n`;
   text += `🆔 <b>ID:</b> <code>${escapeHtml(sc.id)}</code>\n`;
-  text += `🎭 <b>Тон:</b> <code>${escapeHtml(sc.tone || 'epic')}</code> | 🖌 <b>Стиль:</b> <code>${escapeHtml(sc.style || 'star')}</code> | 📐 <b>Сетка:</b> <code>${escapeHtml(sc.layout || 'comic')}</code>\n`;
+  text += `🎭 <b>Тон:</b> <code>${escapeHtml(sc.tone || 'epic')}</code> | 🖌 <b>Стиль:</b> <code>${escapeHtml(sc.style || 'bubble')}</code> | 📐 <b>Сетка:</b> <code>${escapeHtml(sc.layout || 'comic')}</code>\n`;
   if (sc.seed !== undefined) text += `🎲 <b>Seed:</b> <code>${sc.seed}</code>\n`;
   text += `\n📖 <b>Панели (${(sc.panels || []).length}):</b>\n${panels}\n\n`;
   text += `🌐 <b>Источник:</b> ${sourceStr}\n`;

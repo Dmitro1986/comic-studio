@@ -18,7 +18,7 @@ from typing import Any, Mapping
 LAYOUTS = ("comic", "grid", "vertical")
 BUBBLE_STYLES = ("bubble", "star", "gothic", "boom", "memo", "bar", "none")
 BUBBLE_POSITIONS = ("bottom-left", "top-right", "bottom-right", "top-left")
-ALLOWED_PANEL_COUNTS = (3, 4)
+ALLOWED_PANEL_COUNTS = tuple(range(3, 13))  # 3-12 — настраивается здесь
 
 # ID регулярка — согласована с web/lib/validation.js (scenarioId)
 LAYOUT_VALIDATIONS_ID_RE = re.compile(r"^[A-Za-z0-9_-]{4,64}$")
@@ -70,7 +70,7 @@ def validate_layout(layout: Mapping[str, Any]) -> None:
         raise LayoutValidationError("panels must be a non-empty list", code="INVALID_LAYOUT")
     if len(panels) not in ALLOWED_PANEL_COUNTS:
         raise LayoutValidationError(
-            f"invalid panel count: {len(panels)}, expected {ALLOWED_PANEL_COUNTS[0]} or {ALLOWED_PANEL_COUNTS[1]}",
+            f"invalid panel count: {len(panels)}, expected {', '.join(map(str, ALLOWED_PANEL_COUNTS))}",
             code="INVALID_LAYOUT",
         )
 

@@ -66,7 +66,7 @@ def _format_scenario_message(sc: dict) -> str:
         f"🎨 *Новый сценарий* (id: `{sc['id']}`)\n\n"
         f"*{sc.get('title', 'Untitled')}*\n"
         f"Tone: {sc.get('tone', 'epic')} | "
-        f"Style: {sc.get('style', 'star')} | "
+        f"Style: {sc.get('style', 'bubble')} | "
         f"Layout: {sc.get('layout', 'comic')}\n\n"
         f"Панели:\n{panels}\n\n"
         f"Источник: {sc.get('source', 'unknown')}\n\n"

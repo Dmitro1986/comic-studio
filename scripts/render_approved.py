@@ -110,7 +110,7 @@ def _generate_candidate(
         panel_paths=panel_paths,
         captions=captions,
         output_path=final_path,
-        style=scenario.get("style", "star"),
+        style=scenario.get("style", "bubble"),
         layout=scenario.get("layout", "comic"),
         scenario=scenario,  # включает генерацию layout.json и <id>.html (variant B)
     )

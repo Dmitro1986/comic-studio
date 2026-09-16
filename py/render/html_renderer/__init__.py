@@ -14,6 +14,7 @@ backward-compat с Telegram, Notion, archive и social адаптерами.
 __version__ = "0.1.0"
 
 from .layout import (
+    ALLOWED_PANEL_COUNTS,
     LAYOUT_VALIDATIONS_ID_RE,
     LAYOUTS,
     BUBBLE_STYLES,
@@ -25,6 +26,7 @@ from .render import render_html
 
 __all__ = [
     "__version__",
+    "ALLOWED_PANEL_COUNTS",
     "LAYOUT_VALIDATIONS_ID_RE",
     "LAYOUTS",
     "BUBBLE_STYLES",

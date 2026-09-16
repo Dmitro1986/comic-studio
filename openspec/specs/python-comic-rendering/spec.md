@@ -23,14 +23,14 @@ Python пакет `py/render/html_renderer/` генерирует HTML-стра�
 - **THEN** `render_html` бросает `ValueError` и не пишет файл
 
 #### Scenario: Invalid panel count rejected
-- **WHEN** `render_html(layout, output_path)` вызывается с `len(panels) != 3 and != 4`
-- **THEN** `render_html` бросает `ValueError` с message `"invalid panel count: N, expected 3 or 4"`
+- **WHEN** `render_html(layout, output_path)` вызывается с `len(panels) ∉ {3, 4, 5, 6}`
+- **THEN** `render_html` бросает `ValueError` с message `"invalid panel count: N, expected {3, 4, 5, 6}"`
 
 ### Requirement: Layout validation
 Система SHALL предоставлять функцию `html_renderer.validate_layout(layout)` которая проверяет:
 - `id` ∈ `^[A-Za-z0-9_-]{4,64}$`;
 - `layout` ∈ `["comic", "grid", "vertical"]`;
-- `panels` непустой, `len(panels) in {3, 4}`;
+- `panels` непустой, `len(panels) in ALLOWED_PANEL_COUNTS` (по умолчанию `{3, 4, 5, 6}`, настраивается в `layout.py`);
 - каждый panel: `image` присутствует, `bubble_style` ∈ `["bubble", "star", "gothic", "boom", "memo", "bar", "none"]`, `bubble_position` ∈ `["bottom-left", "top-right", "bottom-right", "top-left"]`.
 
 #### Scenario: Validate accepts valid layout

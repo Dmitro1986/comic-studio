@@ -25,7 +25,7 @@
     </div>
   </header>
 
-  <main class="comic comic--{{ layout }}" data-comic-id="{{ comic_id }}">
+  <main class="comic comic--{{ layout }}" data-comic-id="{{ comic_id }}" data-panel-count="{{ panels|length }}">
     {% for panel in panels %}
     <figure class="panel" style="--panel-index: {{ loop.index0 }};">
       <img src="./{{ comic_id }}/{{ panel.image }}" alt="panel {{ panel.n }}{% if panel.caption %} — {{ panel.caption }}{% endif %}" loading="lazy">
