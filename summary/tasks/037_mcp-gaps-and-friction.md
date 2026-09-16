@@ -10,7 +10,7 @@
 | **T2** | **`create_comic` + `expand_panels` — підтримка panel_count 3..6** (issue #2) | 🔴 P0 | ✅ Done | Operator: `create_comic(content, panel_count=6)` дає 6 panels без ручного edit |
 | **T3** | **`render_comic` приймає `provider` + `publish`** (issues #3, #4) | 🔴 P0 | ✅ Done | Operator: один MCP-виклик рендерить через Draw Things + публікує на comic.openaiua.fr |
 | **T4** | **`create_book_html` MCP tool + `book.html.j2` + `book.css`** (issues #5, #7) | 🔴 P0 | ✅ Done | Operator: `create_book_html(id, "sentry")` дає готовий `*-book.html` з правильною палітрою |
-| **T5** | **Draw Things MCP registration + render callback** (issues #6, #9) | 🟡 P1 | ⏳ Todo | `hermes mcp list` показує `draw-things ✓ enabled`; `wait_for_render(id, 240)` повертає done/error |
+| **T5** | **Draw Things MCP registration + render callback** (issues #6, #9) | 🟡 P1 | ✅ Done | `hermes mcp list` показує `draw-things ✓ enabled`; `wait_for_render(id, 240)` повертає done/error |
 | **T6** | **Operations: SSH key + palitra skill + audit→tasks→CHANGELOG→commit** (issues #8, #10) | 🟢 P2 | ⏳ Todo | `git push` працює без ручного вводу пароля; `~/.hermes/skills/comic-book-styles/SKILL.md` існує |
 
 ---
@@ -239,6 +239,53 @@
 - ✅ `POST /api/scenarios/:id/book` для draft state → 409 `BOOK_REQUIRES_RENDERED`
 - ✅ Autoescape увімкнено — raw HTML escape у script/style границях
 - ✅ Atomic write — no `.tmp` files залишаються після рендеру
+
+---
+
+### T5 — Draw Things MCP registration + render callback ✅ DONE
+
+**Реалізовано:**
+
+1. **Draw Things MCP registration** (pre-existing, verified):
+   - `~/.hermes/config.yaml` вже має секцію `mcp_servers.draw-things` (рядки 520–526)
+   - `command: node`, `args: [mcp-server/draw-things/index.js]`
+   - `env.DRAW_THINGS_URL=http://192.168.50.250:7860`, `env.DRAW_THINGS_TIMEOUT=300`
+   - `hermes mcp list` показує `draw-things ✓ enabled` поряд з `comic-server`
+
+2. **`waitForRender(scenarioId, {timeoutSeconds, pollInterval})`** — новий метод в `ComicStudioMcpServer` (`mcp-server/index.js`):
+   - Поллить `GET /api/jobs` кожні `pollInterval` секунд (default 3, min 1, max 10)
+   - Фільтрує jobs за `scenario_id === scenarioId` та `type ∈ {render, publish}` (covers auto-publish chain з T3)
+   - Сортує за `created_at` DESC, бере **latest** job (covers rerender chains)
+   - Термінальні стани: `succeeded`, `failed`, `interrupted` → return immediately
+   - На timeout повертає `{ok: false, timeout: true, last_status, job_id, hint}`
+   - Validation: `timeoutSeconds` clamped до [5, 900], `pollInterval` до [1, 10]
+   - Stderr logging при transient network errors (не крашить polling)
+   - Deadline-respecting sleep: якщо `pollInterval * 1000 > remaining`, sleep `remaining`
+
+3. **`wait_for_render` MCP tool**:
+   - inputSchema: `scenario_id` (required), `timeout_seconds` (default 240), `poll_interval_seconds` (default 3)
+   - Returns: `{ok, timeout, scenario_id, job_id, type, status, duration_seconds, polls, result, error, hint}`
+   - Викликає `this.waitForRender()` з валідацією параметрів
+
+**Тести:**
+- `tests/web_wait_for_render.test.js`: 11/11 pass (новий файл):
+  - Immediate success на succeeded
+  - Failed status detection
+  - Interrupted status detection
+  - Latest-job-by-created_at selection (covers rerender chains)
+  - Queued → running → succeeded transition (multi-poll)
+  - Timeout коли job stays running
+  - Timeout коли no job ever appears
+  - Filter out jobs for other scenarios
+  - Includes publish-type jobs (auto-publish chain)
+  - Transient network errors don't crash polling
+  - Deadline-cap: pollInterval capped to remaining time
+
+**Acceptance досягнуто:**
+- ✅ `hermes mcp list` показує `draw-things ✓ enabled` (verified live)
+- ✅ Draw Things доступний через `mcp-server/draw-things/index.js` без `urllib.request` — оператор більше не потребує direct HTTP calls
+- ✅ `wait_for_render(id, 240)` повертає done/error або timeout з structured response
+- ✅ Operator більше не робить `sleep 240 && ls panel_*.png` — wait_for_render обробляє polling
 
 ---
 
