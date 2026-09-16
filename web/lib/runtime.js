@@ -17,16 +17,71 @@ function defaultOnRevisionComplete({ config, store, logger }) {
         return;
       }
       if (success && parsed && parsed.id) {
+        // Graceful fallback path: LLM call failed or returned invalid output.
+        // We do NOT apply revision and we do NOT mark failed. Instead, we restore
+        // the scenario back to its original approved/rendered queue so the operator
+        // sees no behavioural change.
+        if (parsed.fallback === true) {
+          try {
+            await store.restoreApproval(parsed.id, {
+              requestId: job.request_id,
+              reason: parsed.reason || 'llm_fallback',
+            });
+            logger.warn('revision.fallback', {
+              scenario_id: parsed.id,
+              job_id: job.id,
+              request_id: job.request_id,
+              reason: parsed.reason,
+              warnings: parsed.warnings,
+              feedback_count: parsed.feedback_count,
+            });
+          } catch (restoreErr) {
+            // If restore fails (e.g. legacy draft without revision_source), log loudly
+            // but don't propagate — the scenario is at worst stuck in draft with a
+            // clear revision.fallback log line.
+            logger.error('revision.fallback.restore_failed', {
+              scenario_id: parsed.id,
+              job_id: job.id,
+              request_id: job.request_id,
+              code: restoreErr.code || 'RESTORE_FAILED',
+              message: restoreErr.message,
+            });
+          }
+          return;
+        }
         const record = JSON.parse(fs.readFileSync(path.resolve(config.dataRoot, 'scenarios', 'draft', `${parsed.id}.json`), 'utf-8'));
         await store.applyRevision(parsed.id, record, { requestId: job.request_id, feedbackCount: parsed.feedback_count });
         logger.info('revision.succeeded', { scenario_id: parsed.id, job_id: job.id, request_id: job.request_id, revision_request_id: parsed.revision_at });
       } else if (error) {
-        await store.markRevisionFailed(job.scenario_id, {
-          requestId: job.request_id,
-          errorCode: error.code || 'REVISION_FAILED',
-          message: error.message || 'Revision failed',
-        });
-        logger.warn('revision.failed', { scenario_id: job.scenario_id, job_id: job.id, request_id: job.request_id, code: error.code || 'REVISION_FAILED' });
+        // Hard failure (Python process crashed, timeout, etc.). Restore scenario back
+        // to its original queue rather than leaving it stuck in draft with a failed flag.
+        try {
+          await store.restoreApproval(job.scenario_id, {
+            requestId: job.request_id,
+            reason: error.code || 'process_failed',
+          });
+          logger.warn('revision.failed_restored', {
+            scenario_id: job.scenario_id,
+            job_id: job.id,
+            request_id: job.request_id,
+            code: error.code || 'REVISION_FAILED',
+            message: error.message,
+          });
+        } catch (restoreErr) {
+          // Last-resort: fall back to legacy markRevisionFailed only if restore is impossible.
+          logger.error('revision.failed.restore_failed', {
+            scenario_id: job.scenario_id,
+            job_id: job.id,
+            code: restoreErr.code || 'RESTORE_FAILED',
+            message: restoreErr.message,
+          });
+          await store.markRevisionFailed(job.scenario_id, {
+            requestId: job.request_id,
+            errorCode: error.code || 'REVISION_FAILED',
+            message: error.message || 'Revision failed',
+          });
+          logger.warn('revision.failed', { scenario_id: job.scenario_id, job_id: job.id, request_id: job.request_id, code: error.code || 'REVISION_FAILED' });
+        }
       }
     } catch (inner) {
       logger.error('revision.apply.failed', { scenario_id: job.scenario_id, job_id: job.id, code: inner.code || 'REVISION_APPLY_FAILED', message: inner.message });

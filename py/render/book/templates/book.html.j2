@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }} — knowledge comic</title>
+  <style>
+    {{ css_block }}
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    {# ═══ ОБЛОЖКА ═══ #}
+    <div class="cover">
+      <div class="tagline">{{ tagline }}</div>
+      <h1>{{ title }}</h1>
+      {% if subtitle %}
+      <div class="subtitle">{{ subtitle }}</div>
+      {% endif %}
+      <div class="meta">
+        {% for line in meta_lines %}
+        <p>{{ line|safe }}</p>
+        {% endfor %}
+        <p style="margin-top: 20px; color: var(--accent-light);">📱 Тапните на картинку для увеличения</p>
+      </div>
+      {% if epigraph %}
+      <div class="epigraph">
+        {{ epigraph|safe }}
+      </div>
+      {% endif %}
+    </div>
+
+    {# ═══ СПРАВКА (GLOSSARY) ═══ #}
+    {% if glossary %}
+    <div class="glossary" id="glossary">
+      <h2>Кто есть кто</h2>
+      <dl>
+        {% for term, definition in glossary %}
+        <dt>{{ term }}</dt>
+        <dd>{{ definition }}</dd>
+        {% endfor %}
+      </dl>
+    </div>
+    {% endif %}
+
+    {# ═══ НАВИГАЦИЯ ═══ #}
+    {% if panels %}
+    <nav class="nav">
+      {% if glossary %}<a href="#glossary">↑ Справка</a>{% endif %}
+      {% for panel in panels %}
+      <a href="#act-{{ panel.n }}">{{ roman_numeral(panel.n) }} · {{ panel.page_title }}</a>
+      {% endfor %}
+    </nav>
+    {% endif %}
+
+    {# ═══ РАССКАЗ ПОЛНОСТЬЮ ═══ #}
+    {% if narrative_paragraphs %}
+    <div class="narrative">
+      {% for para in narrative_paragraphs %}
+      <p>{{ para|safe }}</p>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ═══ АКТЫ (PAGES) ═══ #}
+    {% for panel in panels %}
+    <div class="page" id="act-{{ panel.n }}">
+      <div class="page-header">
+        <div class="page-number">{{ roman_numeral(panel.n) }}</div>
+        <div class="page-title">{{ panel.page_title }}</div>
+      </div>
+      <div class="page-render" data-comic="{{ loop.index0 }}" data-title="{{ panel.page_title }}">
+        <div class="zoom-hint">🔍 тап для увеличения</div>
+        <img src="{{ panel.image_url }}" alt="{{ panel.alt_text }}" loading="lazy">
+      </div>
+    </div>
+    {% endfor %}
+
+    {# ═══ ЭПИЛОГ ═══ #}
+    {% if epilogue_text %}
+    <div class="epilogue">
+      <h2>{{ epilogue_title|default('Контекст') }}</h2>
+      <div class="epilogue-text">
+        {{ epilogue_text|safe }}
+        {% if epilogue_author %}
+        <span class="author">— {{ epilogue_author }}</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# ═══ FOOTER ═══ #}
+    <div class="footer">
+      <p>Конец хроники</p>
+      <div class="tech">
+        Сгенерировано через Comic Studio · {{ provider|default('MiniMax') }} · {{ style_name }}<br>
+        Scenario ID: {{ scenario_id }} · {{ panels|length }} панелей
+      </div>
+    </div>
+
+  </div>
+
+  {# ═══ MODAL / LIGHTBOX ═══ #}
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-label="Увеличенное изображение">
+    <button class="modal-close" id="modalClose" aria-label="Закрыть">×</button>
+    <button class="modal-nav modal-prev" id="modalPrev" aria-label="Предыдущая">‹</button>
+    <div class="modal-content">
+      <img id="modalImg" src="" alt="">
+    </div>
+    <button class="modal-nav modal-next" id="modalNext" aria-label="Следующая">›</button>
+    <div class="modal-counter" id="modalCounter"></div>
+  </div>
+
+  <script>
+    (function() {
+      const comics = Array.from(document.querySelectorAll('.page-render'));
+      const modal = document.getElementById('modal');
+      const modalImg = document.getElementById('modalImg');
+      const modalClose = document.getElementById('modalClose');
+      const modalPrev = document.getElementById('modalPrev');
+      const modalNext = document.getElementById('modalNext');
+      const modalCounter = document.getElementById('modalCounter');
+
+      let currentIndex = 0;
+
+      function openModal(index) {
+        currentIndex = index;
+        const img = comics[index].querySelector('img');
+        modalImg.src = img.src;
+        modalImg.alt = img.alt;
+        updateCounter();
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeModal() {
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      function next() {
+        currentIndex = (currentIndex + 1) % comics.length;
+        const img = comics[currentIndex].querySelector('img');
+        modalImg.src = img.src;
+        modalImg.alt = img.alt;
+        updateCounter();
+      }
+
+      function prev() {
+        currentIndex = (currentIndex - 1 + comics.length) % comics.length;
+        const img = comics[currentIndex].querySelector('img');
+        modalImg.src = img.src;
+        modalImg.alt = img.alt;
+        updateCounter();
+      }
+
+      function updateCounter() {
+        const title = comics[currentIndex].dataset.title || '';
+        modalCounter.textContent = (currentIndex + 1) + ' / ' + comics.length + ' · ' + title;
+      }
+
+      comics.forEach((el, idx) => el.addEventListener('click', () => openModal(idx)));
+      modalClose.addEventListener('click', closeModal);
+      modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+      modalNext.addEventListener('click', (e) => { e.stopPropagation(); next(); });
+      modalPrev.addEventListener('click', (e) => { e.stopPropagation(); prev(); });
+      document.addEventListener('keydown', (e) => {
+        if (!modal.classList.contains('active')) return;
+        if (e.key === 'Escape') closeModal();
+        else if (e.key === 'ArrowRight') next();
+        else if (e.key === 'ArrowLeft') prev();
+      });
+    })();
+  </script>
+</body>
+</html>

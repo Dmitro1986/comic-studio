@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from py.scenario import writer
+from py.scenario.writer import RevisionFallback
 
 
 def _build_scenario() -> dict:
@@ -142,7 +143,7 @@ class ReviseScenarioTests(unittest.TestCase):
         original = writer._call_minimax_chat
         writer._call_minimax_chat = fake_chat
         try:
-            with self.assertRaises(_TimeoutLike):
+            with self.assertRaises(RevisionFallback) as ctx:
                 writer.revise_scenario(
                     scenario,
                     [{'text': 'change'}],
@@ -150,6 +151,9 @@ class ReviseScenarioTests(unittest.TestCase):
                 )
         finally:
             writer._call_minimax_chat = original
+        self.assertEqual(ctx.exception.reason, 'llm_timeout')
+        self.assertTrue(len(ctx.exception.warnings) >= 1)
+        self.assertIsInstance(ctx.exception.original_error, _TimeoutLike)
 
     def test_revise_scenario_invalid_json_is_surfaced(self):
         scenario = _build_scenario()
@@ -160,7 +164,7 @@ class ReviseScenarioTests(unittest.TestCase):
         original = writer._call_minimax_chat
         writer._call_minimax_chat = fake_chat
         try:
-            with self.assertRaises(json.JSONDecodeError):
+            with self.assertRaises(RevisionFallback) as ctx:
                 writer.revise_scenario(
                     scenario,
                     [{'text': 'change'}],
@@ -168,6 +172,7 @@ class ReviseScenarioTests(unittest.TestCase):
                 )
         finally:
             writer._call_minimax_chat = original
+        self.assertEqual(ctx.exception.reason, 'llm_invalid_json')
 
     def test_revise_scenario_rejects_non_dict_payload(self):
         scenario = _build_scenario()
@@ -178,7 +183,7 @@ class ReviseScenarioTests(unittest.TestCase):
         original = writer._call_minimax_chat
         writer._call_minimax_chat = fake_chat
         try:
-            with self.assertRaises(ValueError):
+            with self.assertRaises(RevisionFallback) as ctx:
                 writer.revise_scenario(
                     scenario,
                     [{'text': 'change'}],
@@ -186,6 +191,7 @@ class ReviseScenarioTests(unittest.TestCase):
                 )
         finally:
             writer._call_minimax_chat = original
+        self.assertEqual(ctx.exception.reason, 'llm_invalid_json')
 
     def test_revise_scenario_rejects_missing_panels(self):
         scenario = _build_scenario()
@@ -196,7 +202,7 @@ class ReviseScenarioTests(unittest.TestCase):
         original = writer._call_minimax_chat
         writer._call_minimax_chat = fake_chat
         try:
-            with self.assertRaises(ValueError):
+            with self.assertRaises(RevisionFallback) as ctx:
                 writer.revise_scenario(
                     scenario,
                     [{'text': 'change'}],
@@ -204,6 +210,115 @@ class ReviseScenarioTests(unittest.TestCase):
                 )
         finally:
             writer._call_minimax_chat = original
+        self.assertEqual(ctx.exception.reason, 'llm_no_panels')
+
+    def test_revise_scenario_fallback_on_wrong_panel_count(self):
+        """T1: graceful fallback when LLM returns panel count outside ACCEPTED_PANEL_COUNTS (3..6)."""
+        scenario = _build_scenario()
+
+        def fake_chat(system, user):
+            # LLM returned 7 panels — outside ACCEPTED_PANEL_COUNTS (3..6 after T2)
+            return json.dumps({
+                'panels': [
+                    {'n': i, 'prompt': 'p', 'caption': 'ok'}
+                    for i in range(1, 8)
+                ],
+            })
+
+        original = writer._call_minimax_chat
+        writer._call_minimax_chat = fake_chat
+        try:
+            with self.assertRaises(RevisionFallback) as ctx:
+                writer.revise_scenario(scenario, [{'text': 'add many more panels'}])
+        finally:
+            writer._call_minimax_chat = original
+        self.assertEqual(ctx.exception.reason, 'panel_count_out_of_range')
+        self.assertTrue(any('7 panels' in w for w in ctx.exception.warnings))
+        # Original scenario is untouched in caller scope (fallback is exception-only).
+        self.assertEqual(len(scenario['panels']), 3)
+
+    def test_revise_scenario_fallback_on_rate_limit(self):
+        """T1: HTTP 429 from LLM must surface as graceful fallback."""
+        scenario = _build_scenario()
+
+        class _Fake429Response:
+            status_code = 429
+            text = 'rate limit exceeded'
+
+        class _RateLimitError(Exception):
+            def __init__(self):
+                super().__init__('Too Many Requests')
+                self.response = _Fake429Response()
+
+        def fake_chat(system, user):
+            raise _RateLimitError()
+
+        original = writer._call_minimax_chat
+        writer._call_minimax_chat = fake_chat
+        try:
+            with self.assertRaises(RevisionFallback) as ctx:
+                writer.revise_scenario(scenario, [{'text': 'change'}])
+        finally:
+            writer._call_minimax_chat = original
+        self.assertEqual(ctx.exception.reason, 'llm_rate_limited')
+        self.assertIsInstance(ctx.exception.original_error, _RateLimitError)
+
+    def test_revise_scenario_fallback_on_server_error(self):
+        """T1: HTTP 5xx from LLM must surface as graceful fallback."""
+        scenario = _build_scenario()
+
+        class _Fake5xxResponse:
+            status_code = 503
+            text = 'service unavailable'
+
+        class _ServerError(Exception):
+            def __init__(self):
+                super().__init__('Service Unavailable')
+                self.response = _Fake5xxResponse()
+
+        def fake_chat(system, user):
+            raise _ServerError()
+
+        original = writer._call_minimax_chat
+        writer._call_minimax_chat = fake_chat
+        try:
+            with self.assertRaises(RevisionFallback) as ctx:
+                writer.revise_scenario(scenario, [{'text': 'change'}])
+        finally:
+            writer._call_minimax_chat = original
+        self.assertEqual(ctx.exception.reason, 'llm_server_error')
+
+    def test_revise_scenario_fallback_on_validation_error(self):
+        """T1: graceful fallback when LLM returns valid structure but content fails validation."""
+        scenario = _build_scenario()
+
+        def fake_chat(system, user):
+            # 3 panels but with empty prompt in panel #2
+            return json.dumps({
+                'panels': [
+                    {'n': 1, 'prompt': 'ok', 'caption': 'fine'},
+                    {'n': 2, 'prompt': '', 'caption': 'broken'},
+                    {'n': 3, 'prompt': 'ok', 'caption': 'fine'},
+                ],
+            })
+
+        original = writer._call_minimax_chat
+        writer._call_minimax_chat = fake_chat
+        try:
+            with self.assertRaises(RevisionFallback) as ctx:
+                writer.revise_scenario(scenario, [{'text': 'change'}])
+        finally:
+            writer._call_minimax_chat = original
+        self.assertEqual(ctx.exception.reason, 'llm_validation_failed')
+
+    def test_revision_fallback_exception_attributes(self):
+        """RevisionFallback carries reason, warnings, original_error."""
+        cause = RuntimeError('boom')
+        fb = RevisionFallback(reason='test_reason', warnings=['w1', 'w2'], original_error=cause)
+        self.assertEqual(fb.reason, 'test_reason')
+        self.assertEqual(fb.warnings, ['w1', 'w2'])
+        self.assertIs(fb.original_error, cause)
+        self.assertIn('test_reason', str(fb))
 
     def test_format_feedback_history_skips_blank_and_truncates(self):
         history = [{'text': 'первый'}, {'text': ''}, {'text': '   '}, {'text': 'третий'}]

@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from py.scenario.writer import revise_scenario
+from py.scenario.writer import revise_scenario, RevisionFallback
 
 
 def main() -> int:
@@ -67,6 +67,31 @@ def main() -> int:
             source_context=source_context,
             image_style=args.image_style,
         )
+    except RevisionFallback as fallback:
+        # Graceful path: LLM unavailable or returned invalid output.
+        # Return ok=True with fallback=True so the Node runtime preserves
+        # the scenario status and surfaces a warning to the operator.
+        # We do NOT write any scenario file — original panels remain intact.
+        result = {
+            "ok": True,
+            "fallback": True,
+            "id": current.get("id"),
+            "status": current.get("status"),
+            "panels_unchanged": True,
+            "reason": fallback.reason,
+            "warnings": fallback.warnings,
+            "feedback_count": len(feedback),
+        }
+        if args.json_result:
+            print(json.dumps(result, ensure_ascii=False))
+        else:
+            print(
+                f"⚠️  Revision fallback ({fallback.reason}); panels unchanged.",
+                file=sys.stderr,
+            )
+            for w in fallback.warnings:
+                print(f"   • {w}", file=sys.stderr)
+        return 0
     except Exception as error:
         result = {"ok": False, "error": str(error)}
         if args.json_result:

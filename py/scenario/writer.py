@@ -28,15 +28,15 @@ STYLE_TEMPLATES = {
     "watercolor": "watercolor painting style, soft edges, artistic, paper texture, gentle colors",
 }
 
-SYSTEM_PROMPT = """Ты креативный сценарист коротких кинематографичных комиксов (3-4 панели).
+SYSTEM_PROMPT = """Ты креативный сценарист коротких кинематографичных комиксов (3-6 панелей).
 Тебе дают контекст (статья, транскрипт видео, свободный текст).
 Твоя задача — придумать визуальную мини-историю.
 
 ПРАВИЛА:
-- 3 или 4 панели (не больше, не меньше).
+- От 3 до 6 панелей включительно (не меньше 3, не больше 6). Точное количество указывается в требованиях.
 - Каждая панель — конкретная визуальная сцена, описанная как кинематографист.
 - **ПОДПИСИ (captions) — ТОЛЬКО НА РУССКОМ ЯЗЫКЕ.** Краткие, дерзкие, ≤6 слов.
-- Стиль подписей: по умолчанию 'star' (взрыв-POW!), можно 'bubble', 'gothic', 'boom', 'memo', 'bar'.
+- Стиль подписей: по умолчанию 'bubble', также 'star', 'gothic', 'boom', 'memo', 'bar'.
 - Если контекст серьёзный — tone='epic'. Если юмор — tone='funny'. Если обучение — tone='educational'.
 - Персонажи должны быть описаны детально (внешность, одежда, отличительные черты) — это КЛЮЧ к консистентности между панелями.
 - Верни СТРОГО JSON без markdown-обёртки.
@@ -45,7 +45,7 @@ SYSTEM_PROMPT = """Ты креативный сценарист коротких
 {
   "title": "Название комикса",
   "tone": "epic|funny|educational|dark|whimsical",
-  "style": "star|bubble|gothic|boom|memo|bar",
+  "style": "bubble|star|gothic|boom|memo|bar",
   "layout": "comic|grid",
   "aspect_ratio": "16:9",
   "characters": [
@@ -61,7 +61,12 @@ SYSTEM_PROMPT = """Ты креативный сценарист коротких
 
 
 def _call_minimax_chat(system: str, user: str) -> str:
-    """Минимальный вызов MiniMax chat API (compatible mode)."""
+    """Минимальный вызов MiniMax chat API (compatible mode).
+
+    Raises RuntimeError on auth/network/JSON errors. Callers (e.g. revise_scenario)
+    are responsible for wrapping this in RevisionFallback to enable graceful
+    degradation when the LLM is unavailable.
+    """
     import requests
 
     if not MINIMAX_API_KEY:
@@ -94,6 +99,60 @@ def _call_minimax_chat(system: str, user: str) -> str:
     raise RuntimeError(f"Unexpected response: {data}")
 
 
+def _call_minimax_chat_for_revision(system: str, user: str, scenario_id: Optional[str] = None) -> str:
+    """Wrapper around _call_minimax_chat that logs full diagnostics on failure.
+
+    Emits a `revision.llm_failed` log event with stderr-style fields (HTTP status,
+    response excerpt, exception class). Returns raw LLM text on success.
+    Raises RevisionFallback on any error so the caller can return current panels.
+    """
+    import traceback
+
+    try:
+        return _call_minimax_chat(system, user)
+    except Exception as error:
+        tb = traceback.format_exc()
+        error_class = error.__class__.__name__
+        http_status = getattr(getattr(error, "response", None), "status_code", None)
+        response_excerpt = None
+        response_obj = getattr(error, "response", None)
+        if response_obj is not None:
+            try:
+                response_excerpt = (response_obj.text or "")[:500]
+            except Exception:
+                response_excerpt = None
+
+        logger.error(
+            "revision.llm_failed",
+            extra={
+                "scenario_id": scenario_id,
+                "error_class": error_class,
+                "error_message": str(error),
+                "http_status": http_status,
+                "response_excerpt": response_excerpt,
+                "traceback": tb,
+            },
+        )
+
+        reason = "llm_error"
+        message = str(error) or error_class
+        if "timeout" in message.lower() or "timed out" in message.lower():
+            reason = "llm_timeout"
+        elif http_status == 429:
+            reason = "llm_rate_limited"
+        elif http_status is not None and http_status >= 500:
+            reason = "llm_server_error"
+
+        raise RevisionFallback(
+            reason=reason,
+            warnings=[
+                f"LLM call failed: {error_class}: {message}",
+                "Returning current panels unchanged; scenario status preserved.",
+            ],
+            original_error=error,
+        )
+
+
 def _extract_json(text: str) -> dict:
     """Извлекает JSON из ответа LLM, даже если обёрнут в ```json ... ```."""
     text = text.strip()
@@ -108,7 +167,32 @@ MAX_REVISION_HISTORY = 10
 MAX_FEEDBACK_FOR_REVISION = 20
 MAX_PROMPT_CHARS = 1_500
 MAX_CAPTION_WORDS = 6
-ACCEPTED_PANEL_COUNTS = (3, 4)
+ACCEPTED_PANEL_COUNTS = (3, 4, 5, 6)
+DEFAULT_PANEL_COUNT = 3
+MIN_PANEL_COUNT = 3
+MAX_PANEL_COUNT = 6
+
+
+class RevisionFallback(Exception):
+    """Raised when revision cannot be safely regenerated via LLM.
+
+    Carries enough context for the caller to gracefully return current panels
+    WITHOUT changing the scenario status. Used when:
+      - LLM call timed out, rate-limited, or 5xx
+      - LLM returned malformed JSON
+      - LLM returned a panel count outside ACCEPTED_PANEL_COUNTS
+
+    Attributes:
+        reason: short machine-readable code (e.g. "llm_timeout", "panel_count_out_of_range")
+        warnings: list of human-readable strings for the operator
+        original_error: underlying exception (if any) for diagnostics
+    """
+
+    def __init__(self, reason: str, warnings: list, original_error: Optional[BaseException] = None):
+        self.reason = reason
+        self.warnings = list(warnings)
+        self.original_error = original_error
+        super().__init__(f"Revision fallback: {reason}")
 
 REVISION_SYSTEM_PROMPT = """Ты редактор комикс-сценария, который обновляет существующий JSON-сценарий, применяя отзыв автора.
 
@@ -125,7 +209,7 @@ REVISION_SYSTEM_PROMPT = """Ты редактор комикс-сценария,
 {
   "title": "Название комикса",
   "tone": "epic|funny|educational|dark|whimsical",
-  "style": "star|bubble|gothic|boom|memo|bar",
+  "style": "bubble|star|gothic|boom|memo|bar",
   "layout": "comic|grid",
   "aspect_ratio": "16:9",
   "characters": [
@@ -158,6 +242,10 @@ def generate_scenario(
     Returns:
         dict со всеми полями сценария + id, created_at, status, source
     """
+    if num_panels not in ACCEPTED_PANEL_COUNTS:
+        raise ValueError(
+            f"generate_scenario: num_panels={num_panels} must be in {list(ACCEPTED_PANEL_COUNTS)}"
+        )
     # Enforce spec drafting context bound
     bounded = context[:MAX_CONTEXT_CHARS]
     if len(context) > MAX_CONTEXT_CHARS:
@@ -184,7 +272,7 @@ def generate_scenario(
 
     # Дефолты
     scenario.setdefault("tone", tone or "epic")
-    scenario.setdefault("style", style or "star")
+    scenario.setdefault("style", style or "bubble")
     scenario.setdefault("image_style", image_style or "comic")
     scenario.setdefault("layout", "comic")
     scenario.setdefault("aspect_ratio", "16:9")
@@ -230,6 +318,201 @@ def save_scenario(scenario: dict, status: str = "draft") -> str:
     )
     logger.info(f"Saved scenario → {out_path}")
     return str(out_path)
+
+
+def _build_expand_panel_user_msg(
+    current_scenario: dict,
+    new_panel_n: int,
+    target_count: int,
+    scene_hint: Optional[str] = None,
+) -> str:
+    """Build the LLM user-message that asks for ONE additional panel."""
+    bounded_context = (current_scenario.get("context") or "")[:MAX_CONTEXT_CHARS]
+    panels_summary = json.dumps(current_scenario.get("panels", []), ensure_ascii=False)[:2000]
+    characters_summary = json.dumps(current_scenario.get("characters", []), ensure_ascii=False)
+    style_suffix = STYLE_TEMPLATES.get(current_scenario.get("image_style", "comic"), STYLE_TEMPLATES["comic"])
+    msg = (
+        f"Исходный контекст:\n\n{bounded_context}\n\n"
+        f"Текущий сценарий (id={current_scenario.get('id')}, panel {new_panel_n - 1} из {target_count}):\n"
+        f"title={current_scenario.get('title', '')}\n"
+        f"tone={current_scenario.get('tone', 'epic')}\n"
+        f"style={current_scenario.get('style', 'bubble')}\n"
+        f"image_style={current_scenario.get('image_style', 'comic')}\n"
+        f"characters={characters_summary}\n"
+        f"existing_panels={panels_summary}\n\n"
+        f"Придумай ОДНУ новую панель №{new_panel_n}, которая продолжает историю."
+        f" Сохраняй стиль подписей: 'bubble', 'star', 'gothic', 'boom', 'memo', 'bar'."
+        f" Финальный итог сценария: {target_count} панелей.\n"
+    )
+    if scene_hint:
+        msg += f"\nПодсказка от автора: {scene_hint}\n"
+    msg += (
+        "\nФормат ответа (СТРОГО JSON без markdown):\n"
+        "{\n"
+        '  "panel": {\n'
+        '    "n": ' + str(new_panel_n) + ",\n"
+        '    "prompt": "детальное визуальное описание сцены на английском, ≤1500 chars. В начале: CHARACTERS: <имя>: <описание>. Персонажей указывать по именам. Затем: , ' + style_suffix + '",\n'
+        '    "caption": "подпись на РУССКОМ, ≤6 слов"\n'
+        "  }\n"
+        "}\n"
+    )
+    return msg
+
+
+EXPANSION_SYSTEM_PROMPT = """Ты сценарист комикса, который добавляет ОДНУ новую панель к существующему сценарию.
+
+ПРАВИЛА:
+- Сохрани тон, стиль подписей и описания персонажей из существующего сценария.
+- Новая панель должна логически продолжать историю, не повторять уже существующие панели.
+- Caption ≤6 слов, только на русском.
+- Prompt ≤1500 символов, на английском. Если есть персонажи — начни с `CHARACTERS: <имя>: <описание>.`
+- Верни СТРОГО JSON без markdown-обёртки.
+"""
+
+
+def expand_panels(
+    current_scenario: dict,
+    target_count: int,
+    scene_hints: Optional[list] = None,
+) -> dict:
+    """Incrementally expand a draft scenario up to ``target_count`` panels.
+
+    Adds one panel at a time via LLM, preserving all existing panels. If the
+    LLM fails for any single panel, raises RevisionFallback so the caller can
+    leave the scenario unchanged.
+
+    Args:
+        current_scenario: current draft record (must have id, panels, status).
+        target_count: desired final panel count, must be in ACCEPTED_PANEL_COUNTS
+                      and strictly greater than the current panel count.
+        scene_hints: optional list of natural-language hints, one per new panel.
+                     If shorter than the number of new panels, missing hints are
+                     filled with empty strings.
+
+    Returns:
+        dict clone of ``current_scenario`` with extended ``panels`` list, an
+        ``expansion_history`` field tracking each added panel, and updated
+        ``expanded_at`` timestamp.
+    """
+    if not isinstance(current_scenario, dict) or not current_scenario.get("id"):
+        raise ValueError("expand_panels: current_scenario must include id")
+    if target_count not in ACCEPTED_PANEL_COUNTS:
+        raise ValueError(
+            f"expand_panels: target_count={target_count} must be in {list(ACCEPTED_PANEL_COUNTS)}"
+        )
+    existing_panels = current_scenario.get("panels") or []
+    if not isinstance(existing_panels, list):
+        raise ValueError("expand_panels: existing panels must be a list")
+    current_count = len(existing_panels)
+    if current_count >= target_count:
+        raise ValueError(
+            f"expand_panels: scenario already has {current_count} panels, target={target_count} is not greater"
+        )
+    if current_count < MIN_PANEL_COUNT:
+        raise ValueError(
+            f"expand_panels: scenario has only {current_count} panels; minimum is {MIN_PANEL_COUNT}"
+        )
+
+    scene_hints = scene_hints or []
+    added_panels = []
+    panels_working = list(existing_panels)  # shallow copy
+
+    for offset, new_n in enumerate(range(current_count + 1, target_count + 1)):
+        hint = scene_hints[offset] if offset < len(scene_hints) else None
+        user_msg = _build_expand_panel_user_msg(
+            current_scenario={**current_scenario, "panels": panels_working},
+            new_panel_n=new_n,
+            target_count=target_count,
+            scene_hint=hint,
+        )
+        try:
+            raw = _call_minimax_chat_for_revision(
+                EXPANSION_SYSTEM_PROMPT,
+                user_msg,
+                scenario_id=current_scenario.get("id"),
+            )
+        except RevisionFallback:
+            # Surface so caller can leave scenario unchanged.
+            raise
+
+        try:
+            parsed = _extract_json(raw)
+        except (ValueError, json.JSONDecodeError) as error:
+            raise RevisionFallback(
+                reason="expand_invalid_json",
+                warnings=[
+                    f"LLM returned malformed JSON for panel #{new_n}: {error}",
+                    "Expansion aborted; scenario panels unchanged.",
+                ],
+                original_error=error,
+            )
+
+        if not isinstance(parsed, dict) or not isinstance(parsed.get("panel"), dict):
+            raise RevisionFallback(
+                reason="expand_invalid_structure",
+                warnings=[
+                    f"LLM response for panel #{new_n} has no 'panel' object.",
+                    "Expansion aborted; scenario panels unchanged.",
+                ],
+            )
+        new_panel = parsed["panel"]
+        if not isinstance(new_panel.get("prompt"), str) or not new_panel["prompt"].strip():
+            raise RevisionFallback(
+                reason="expand_empty_prompt",
+                warnings=[
+                    f"LLM returned empty prompt for panel #{new_n}.",
+                    "Expansion aborted; scenario panels unchanged.",
+                ],
+            )
+        if not isinstance(new_panel.get("caption"), str) or not new_panel["caption"].strip():
+            raise RevisionFallback(
+                reason="expand_empty_caption",
+                warnings=[
+                    f"LLM returned empty caption for panel #{new_n}.",
+                    "Expansion aborted; scenario panels unchanged.",
+                ],
+            )
+        if len(new_panel["prompt"]) > MAX_PROMPT_CHARS:
+            raise RevisionFallback(
+                reason="expand_prompt_too_long",
+                warnings=[
+                    f"LLM prompt for panel #{new_n} exceeds {MAX_PROMPT_CHARS} chars.",
+                    "Expansion aborted; scenario panels unchanged.",
+                ],
+            )
+        # Truncate caption to MAX_CAPTION_WORDS (same as revise)
+        caption_words = new_panel["caption"].split()
+        if len(caption_words) > MAX_CAPTION_WORDS:
+            new_panel["caption"] = " ".join(caption_words[:MAX_CAPTION_WORDS])
+
+        # Re-stamp panel number and append
+        new_panel["n"] = new_n
+        new_panel["added_via_expansion"] = True
+        panels_working.append(new_panel)
+        added_panels.append(new_n)
+
+        logger.info(
+            f"Expansion added panel {new_n}/{target_count} for scenario id={current_scenario.get('id')}"
+        )
+
+    # Build updated scenario record
+    expansion_history = list(current_scenario.get("expansion_history") or [])
+    expansion_history.append(
+        {
+            "ts": datetime.now().isoformat(),
+            "from_count": current_count,
+            "to_count": target_count,
+            "added_panels": added_panels,
+            "hints_provided": len(scene_hints),
+        }
+    )
+    updated = {
+        **current_scenario,
+        "panels": panels_working,
+        "expansion_history": expansion_history,
+        "expanded_at": datetime.now().isoformat(),
+    }
+    return updated
 
 
 def _format_feedback_history(feedback_history: list) -> str:
@@ -315,8 +598,35 @@ def revise_scenario(
     logger.info(
         f"Revising scenario id={current_scenario.get('id')} with {len(feedback_history)} feedback items"
     )
-    raw = _call_minimax_chat(REVISION_SYSTEM_PROMPT, user_msg)
-    revised = _extract_json(raw)
+
+    # Step 1: call LLM with structured fallback on any error (timeout, rate-limit, 5xx, JSON)
+    try:
+        raw = _call_minimax_chat_for_revision(REVISION_SYSTEM_PROMPT, user_msg, scenario_id=current_scenario.get("id"))
+    except RevisionFallback:
+        # Re-raise so caller (CLI / runtime) can restore scenario state and return panels unchanged.
+        raise
+
+    # Step 2: parse JSON (catch malformed output as fallback)
+    try:
+        revised = _extract_json(raw)
+    except (ValueError, json.JSONDecodeError) as error:
+        logger.error(
+            "revision.json_invalid",
+            extra={
+                "scenario_id": current_scenario.get("id"),
+                "error_class": error.__class__.__name__,
+                "error_message": str(error),
+                "raw_excerpt": (raw or "")[:500],
+            },
+        )
+        raise RevisionFallback(
+            reason="llm_invalid_json",
+            warnings=[
+                f"LLM returned malformed JSON: {error}",
+                "Returning current panels unchanged; scenario status preserved.",
+            ],
+            original_error=error,
+        )
 
     if isinstance(revised, dict) and isinstance(revised.get("panels"), list):
         for panel in revised["panels"]:
@@ -325,11 +635,50 @@ def revise_scenario(
                 if len(words) > MAX_CAPTION_WORDS:
                     panel["caption"] = " ".join(words[:MAX_CAPTION_WORDS])
 
-    _validate_revision_response(revised)
+    # Step 3: validate panel count — if LLM gave us wrong shape, fall back instead of failing
+    if not isinstance(revised, dict):
+        raise RevisionFallback(
+            reason="llm_invalid_json",
+            warnings=["LLM response is not a JSON object.", "Returning current panels unchanged."],
+        )
+    if not isinstance(revised.get("panels"), list) or not revised["panels"]:
+        raise RevisionFallback(
+            reason="llm_no_panels",
+            warnings=["LLM response has no panels array.", "Returning current panels unchanged."],
+        )
+    if len(revised["panels"]) not in ACCEPTED_PANEL_COUNTS:
+        actual = len(revised["panels"])
+        raise RevisionFallback(
+            reason="panel_count_out_of_range",
+            warnings=[
+                f"LLM returned {actual} panels, expected one of {list(ACCEPTED_PANEL_COUNTS)}.",
+                "Returning current panels unchanged; scenario status preserved.",
+            ],
+        )
+
+    # Step 4: full validation only when shape passed; surface remaining issues as fallback
+    try:
+        _validate_revision_response(revised)
+    except ValueError as error:
+        logger.error(
+            "revision.validation_failed",
+            extra={
+                "scenario_id": current_scenario.get("id"),
+                "error_message": str(error),
+            },
+        )
+        raise RevisionFallback(
+            reason="llm_validation_failed",
+            warnings=[
+                f"LLM response failed validation: {error}",
+                "Returning current panels unchanged; scenario status preserved.",
+            ],
+            original_error=error,
+        )
 
     revised.setdefault("title", current_scenario.get("title"))
     revised.setdefault("tone", current_scenario.get("tone", "epic"))
-    revised.setdefault("style", current_scenario.get("style", "star"))
+    revised.setdefault("style", current_scenario.get("style", "bubble"))
     revised.setdefault("image_style", image_style)
     revised.setdefault("layout", current_scenario.get("layout", "comic"))
     revised.setdefault("aspect_ratio", current_scenario.get("aspect_ratio", "16:9"))

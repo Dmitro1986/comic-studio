@@ -62,6 +62,7 @@ export function loadConfig(env = process.env, overrides = {}) {
   const dataRoot = path.resolve(overrides.dataRoot || env.DATA_ROOT || path.join(projectRoot, 'data'));
   const defaultVenv = path.join(projectRoot, '.venv', 'bin', 'python3');
   const pythonBin = overrides.pythonBin || env.PYTHON_BIN || (fs.existsSync(defaultVenv) ? defaultVenv : 'python3');
+  const nodeBin = overrides.nodeBin || env.NODE_BIN || (fs.existsSync(path.join(projectRoot, '.nvm', 'versions', 'node')) ? 'node' : 'node');
   const allowedOrigins = overrides.allowedOrigins || parseOrigins(env.WEB_ALLOWED_ORIGINS);
   const apiToken = overrides.apiToken ?? env.WEB_API_TOKEN ?? '';
   const remoteMode = !isLoopbackHost(host);
@@ -79,6 +80,7 @@ export function loadConfig(env = process.env, overrides = {}) {
     port,
     dataRoot,
     pythonBin,
+    nodeBin,
     allowedOrigins: Object.freeze([...allowedOrigins]),
     apiToken,
     remoteMode,
@@ -93,6 +95,8 @@ export function loadConfig(env = process.env, overrides = {}) {
     maxSeed: overrides.maxSeed ?? intValue(env, 'WEB_MAX_SEED', 2_147_483_647, { min: 1, max: Number.MAX_SAFE_INTEGER }),
     ingestTimeoutMs: overrides.ingestTimeoutMs ?? intValue(env, 'WEB_INGEST_TIMEOUT_MS', 180_000, { min: 100, max: 3_600_000 }),
     renderTimeoutMs: overrides.renderTimeoutMs ?? intValue(env, 'WEB_RENDER_TIMEOUT_MS', 600_000, { min: 100, max: 7_200_000 }),
+    publishTimeoutMs: overrides.publishTimeoutMs ?? intValue(env, 'WEB_PUBLISH_TIMEOUT_MS', 180_000, { min: 100, max: 1_800_000 }),
+    defaultRenderProvider: overrides.defaultRenderProvider ?? (env.WEB_DEFAULT_RENDER_PROVIDER || 'minimax'),
     processOutputLimit: overrides.processOutputLimit ?? intValue(env, 'WEB_PROCESS_OUTPUT_LIMIT', 10 * 1024 * 1024, { min: 1024, max: 100 * 1024 * 1024 }),
     jobRetentionMs: overrides.jobRetentionMs ?? intValue(env, 'WEB_JOB_RETENTION_MS', 7 * 24 * 60 * 60 * 1000, { min: 1000 }),
     artifactRetentionMs: overrides.artifactRetentionMs ?? intValue(env, 'WEB_ARTIFACT_RETENTION_MS', 24 * 60 * 60 * 1000, { min: 1000 }),

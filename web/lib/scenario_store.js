@@ -255,17 +255,71 @@ export class ScenarioStore {
         revision_at: now,
         revision_source: current.state,
         draft_at: now,
+        // NOTE: approved_at / rendered_at / render_revision / panel_paths / comic_path
+        // are intentionally preserved so that a graceful fallback (RevisionFallback)
+        // can restore the scenario to its previous queue with full fidelity.
+        // They will be overwritten naturally on re-render after a successful revision.
       };
-      delete next.approved_at;
-      delete next.rendered_at;
-      delete next.render_revision;
-      delete next.panel_paths;
-      delete next.comic_path;
       delete next._transition;
       atomicWriteJson(destination, next);
       fs.unlinkSync(current.path);
       this.logger?.info('scenario.revoke', { scenario_id: id, from: current.state, reason });
       return { record: next, previous: current.state };
+    });
+  }
+
+  /**
+   * Restore a scenario from the draft queue back to its original approved/rendered queue.
+   * Used as part of the graceful fallback flow when the LLM revision failed:
+   * the scenario was moved to draft by `revokeApproval`, but instead of marking it
+   * failed we move it back so the operator keeps working with the original state.
+   *
+   * Refuses to act if the scenario is in any state other than 'draft' with a known
+   * revision_source.
+   */
+  async restoreApproval(id, { requestId, reason = 'revision_fallback' } = {}) {
+    return this.lock.withKey(id, async () => {
+      const current = this.get(id);
+      if (current.state !== 'draft') {
+        throw conflict('RESTORE_TARGET_INVALID', `Can only restore scenarios from draft queue (got ${current.state})`);
+      }
+      const source = current.record.revision_source;
+      if (!['approved', 'rendered'].includes(source)) {
+        throw conflict('RESTORE_SOURCE_UNKNOWN', `Cannot restore: revision_source=${source || 'unset'}`);
+      }
+      const now = this.clock().toISOString();
+      const destination = this.scenarioPath(source, id);
+      if (fs.existsSync(destination)) {
+        throw conflict('RESTORE_DESTINATION_EXISTS', `Destination already exists for restored scenario: ${destination}`);
+      }
+      const next = {
+        ...current.record,
+        status: source,
+        approved_at: source === 'approved' ? (current.record.approved_at || now) : undefined,
+        rendered_at: source === 'rendered' ? (current.record.rendered_at || now) : undefined,
+        // Clean revision bookkeeping so the scenario behaves as if revision never happened.
+        revision_status: 'none',
+        revision_at: now,
+        revision_request_id: requestId || current.record.revision_request_id,
+        revision_source: undefined,
+        revision_history: [
+          ...(Array.isArray(current.record.revision_history) ? current.record.revision_history : []),
+          {
+            ts: now,
+            status: 'revision_restored',
+            request_id: requestId || current.record.revision_request_id,
+            feedback_count: current.record.feedback_count || 0,
+            reason,
+          },
+        ].slice(-this.maxRevisionHistory),
+      };
+      // Drop fields that were intentionally absent before the revision started
+      // (no-op if they were preserved by revokeApproval; this only matters for legacy drafts).
+      for (const field of ['revision_source', '_transition']) delete next[field];
+      atomicWriteJson(destination, next);
+      fs.unlinkSync(current.path);
+      this.logger?.info('scenario.restore', { scenario_id: id, to: source, reason });
+      return { record: next, restored_to: source };
     });
   }
 

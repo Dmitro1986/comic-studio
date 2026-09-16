@@ -1,0 +1,405 @@
+/* Comic Studio Knowledge Book — generic CSS
+ * Variables injected from `py/render/book/palettes.py` at render time.
+ * Required variables: --primary, --primary-light, --primary-dark,
+ *                     --accent, --accent-light, --accent-dark,
+ *                     --paper, --paper-dark, --paper-light,
+ *                     --ink, --ink-light, --shadow, --ui (optional).
+ * See palettes.py for the canonical palette schema.
+ */
+
+    {{palette_vars}}
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--ink);
+      background-image:
+        radial-gradient(ellipse at 50% 0%, color-mix(in srgb, var(--primary) 30%, transparent), transparent 60%),
+        radial-gradient(circle at 80% 80%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 50%);
+      color: var(--paper);
+      font-family: Georgia, 'Times New Roman', serif;
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 60px 40px;
+    }
+
+    /* === Cover === */
+    .cover {
+      text-align: center;
+      padding: 100px 40px;
+      border-bottom: 2px solid var(--primary);
+      margin-bottom: 80px;
+      position: relative;
+      background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 20%, transparent) 0%, color-mix(in srgb, var(--ink) 5%, transparent) 100%);
+    }
+
+    .cover::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, var(--primary) 30%, var(--accent) 70%, transparent);
+    }
+
+    .cover .tagline {
+      font-size: 0.95em;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--accent-light);
+      margin-bottom: 20px;
+    }
+
+    .cover h1 {
+      font-size: 4.6em;
+      font-weight: bold;
+      color: var(--primary-light);
+      letter-spacing: 0.05em;
+      text-shadow: 0 0 30px color-mix(in srgb, var(--primary) 70%, transparent);
+      margin-bottom: 20px;
+    }
+
+    .cover .subtitle {
+      font-size: 1.5em;
+      color: var(--accent-light);
+      font-style: italic;
+      margin-bottom: 60px;
+      letter-spacing: 0.05em;
+    }
+
+    .cover .meta {
+      font-size: 0.95em;
+      color: var(--paper-dark);
+      line-height: 2;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .cover .epigraph {
+      margin-top: 60px;
+      padding: 30px 40px;
+      border-left: 4px solid var(--accent);
+      font-style: italic;
+      font-size: 1.1em;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+      color: var(--paper);
+      text-align: left;
+      font-family: Georgia, serif;
+    }
+
+    /* === Glossary === */
+    .glossary {
+      margin: 80px 0;
+      padding: 60px 40px;
+      border: 1px solid var(--primary);
+      background: color-mix(in srgb, var(--primary) 6%, transparent);
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .glossary h2 {
+      font-size: 1.6em;
+      color: var(--accent-light);
+      margin-bottom: 30px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .glossary dl {
+      display: grid;
+      grid-template-columns: 160px 1fr;
+      gap: 20px 30px;
+      align-items: start;
+    }
+
+    .glossary dt {
+      font-family: Georgia, serif;
+      font-weight: bold;
+      font-size: 1.1em;
+      color: var(--primary-light);
+      letter-spacing: 0.05em;
+      padding-top: 4px;
+    }
+
+    .glossary dd {
+      margin: 0;
+      font-family: Georgia, serif;
+      font-size: 1em;
+      line-height: 1.7;
+      color: var(--paper);
+    }
+
+    @media (max-width: 768px) {
+      .glossary { padding: 30px 20px; }
+      .glossary dl { grid-template-columns: 1fr; gap: 8px 0; }
+      .glossary dt { padding-top: 16px; }
+    }
+
+    /* === Page === */
+    .page {
+      margin-bottom: 100px;
+      position: relative;
+      page-break-after: always;
+    }
+
+    .page-header {
+      display: flex;
+      align-items: baseline;
+      gap: 30px;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 1px dashed var(--accent);
+    }
+
+    .page-number {
+      font-size: 2.5em;
+      color: var(--accent-light);
+      font-weight: bold;
+    }
+
+    .page-title {
+      font-size: 1.6em;
+      color: var(--primary-light);
+      letter-spacing: 0.05em;
+    }
+
+    .narrative {
+      margin: 25px 0;
+      padding: 22px 28px;
+      background: color-mix(in srgb, var(--primary) 8%, transparent);
+      border-left: 3px solid var(--accent);
+      color: var(--paper);
+      font-style: italic;
+      font-size: 1.05em;
+      line-height: 1.8;
+      max-width: 900px;
+      margin-left: auto;
+      margin-right: auto;
+      font-family: Georgia, serif;
+    }
+
+    .narrative p { margin-bottom: 12px; }
+    .narrative p:last-child { margin-bottom: 0; }
+
+    .page-render {
+      margin: 25px 0;
+      position: relative;
+      border: 1px solid var(--primary);
+      box-shadow:
+        0 0 50px color-mix(in srgb, var(--primary) 30%, transparent),
+        inset 0 0 60px color-mix(in srgb, var(--ink) 30%, transparent);
+      background: var(--shadow);
+      overflow: hidden;
+      cursor: zoom-in;
+      transition: transform 0.2s;
+    }
+
+    .page-render:hover {
+      transform: scale(1.005);
+      border-color: var(--accent);
+    }
+
+    .page-render:active {
+      transform: scale(0.998);
+    }
+
+    .page-render img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .zoom-hint {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: color-mix(in srgb, var(--ink) 80%, transparent);
+      color: var(--accent-light);
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 0.85em;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .page-render:hover .zoom-hint { opacity: 1; }
+
+    /* === Epilogue / footer === */
+    .epilogue {
+      margin: 80px auto;
+      padding: 60px 40px;
+      max-width: 900px;
+      border-top: 2px solid var(--primary);
+      border-bottom: 1px dashed var(--accent);
+    }
+
+    .epilogue h2 {
+      font-size: 1.6em;
+      color: var(--accent-light);
+      margin-bottom: 25px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .epilogue-text {
+      font-size: 1.05em;
+      line-height: 1.8;
+      color: var(--paper);
+    }
+
+    .epilogue .author {
+      display: block;
+      margin-top: 30px;
+      font-style: italic;
+      color: var(--paper-dark);
+      font-size: 0.9em;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 40px 20px;
+      border-top: 1px solid var(--primary);
+      color: var(--paper-dark);
+      font-size: 0.9em;
+    }
+
+    .footer .tech {
+      margin-top: 12px;
+      font-size: 0.85em;
+      opacity: 0.7;
+      line-height: 1.6;
+    }
+
+    /* === Navigation === */
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px 22px;
+      justify-content: center;
+      padding: 30px 20px;
+      margin: 60px auto;
+      max-width: 1100px;
+      border-top: 1px dashed var(--accent);
+      border-bottom: 1px dashed var(--accent);
+      background: color-mix(in srgb, var(--primary) 4%, transparent);
+    }
+
+    .nav a {
+      color: var(--accent-light);
+      text-decoration: none;
+      letter-spacing: 0.05em;
+      font-size: 0.95em;
+      padding: 4px 8px;
+      transition: color 0.2s;
+    }
+
+    .nav a:hover {
+      color: var(--primary-light);
+      text-decoration: underline;
+    }
+
+    /* === Modal / lightbox === */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: color-mix(in srgb, var(--shadow) 95%, transparent);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+
+    .modal.active { display: flex; }
+
+    .modal-content {
+      max-width: 90vw;
+      max-height: 90vh;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-content img {
+      max-width: 100%;
+      max-height: 90vh;
+      display: block;
+      border: 2px solid var(--accent);
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: color-mix(in srgb, var(--ink) 70%, transparent);
+      color: var(--accent-light);
+      border: 1px solid var(--accent);
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      font-size: 1.6em;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .modal-close:hover {
+      background: var(--accent);
+      color: var(--ink);
+    }
+
+    .modal-nav {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      background: color-mix(in srgb, var(--ink) 70%, transparent);
+      color: var(--accent-light);
+      border: 1px solid var(--accent);
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      font-size: 2em;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .modal-nav:hover {
+      background: var(--accent);
+      color: var(--ink);
+    }
+
+    .modal-prev { left: 20px; }
+    .modal-next { right: 20px; }
+
+    .modal-counter {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: color-mix(in srgb, var(--ink) 80%, transparent);
+      color: var(--accent-light);
+      padding: 8px 16px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    @media (max-width: 768px) {
+      .container { padding: 30px 16px; }
+      .cover { padding: 60px 20px; }
+      .cover h1 { font-size: 2.6em; }
+      .cover .subtitle { font-size: 1.2em; }
+      .page { margin-bottom: 60px; }
+      .nav { gap: 8px 12px; padding: 20px 10px; }
+      .modal { padding: 10px; }
+      .modal-nav { width: 44px; height: 44px; font-size: 1.4em; }
+    }

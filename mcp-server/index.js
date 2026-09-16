@@ -72,9 +72,41 @@ class ComicStudioMcpServer {
                 caption_style: {
                   type: "string",
                   description: "Caption style (e.g. bubble, star, gothic, boom, memo, bar)"
+                },
+                panel_count: {
+                  type: "integer",
+                  description: "Number of panels to generate (3..6, default 3)",
+                  minimum: 3,
+                  maximum: 6,
+                  default: 3
                 }
               },
               required: ["content"]
+            }
+          },
+          {
+            name: "expand_panels",
+            description: "Incrementally expand a draft scenario with additional panels (3..6). Adds one panel at a time via LLM, preserves existing panels. On LLM failure returns fallback with panels unchanged.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: {
+                  type: "string",
+                  description: "Scenario ID (8 chars hex)"
+                },
+                target_count: {
+                  type: "integer",
+                  description: "Desired final panel count (3..6, must be greater than current)",
+                  minimum: 3,
+                  maximum: 6
+                },
+                scene_hints: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Optional per-panel hints (one per new panel). Missing hints are filled with empty strings."
+                }
+              },
+              required: ["id", "target_count"]
             }
           },
           {
@@ -108,14 +140,58 @@ class ComicStudioMcpServer {
           },
           {
             name: "render_comic",
-            description: "Start rendering an approved or rendered scenario",
+            description: "Start rendering an approved or rendered scenario. Supports provider selection (minimax|draw-things) and auto-publish chain.",
             inputSchema: {
               type: "object",
               properties: {
                 id: { type: "string" },
-                mode: { type: "string", enum: ["initial", "rerender"] }
+                mode: { type: "string", enum: ["initial", "rerender"] },
+                provider: {
+                  type: "string",
+                  enum: ["minimax", "draw-things"],
+                  default: "minimax",
+                  description: "Image generation provider. draw-things requires local SDXL backend."
+                },
+                publish: {
+                  type: "boolean",
+                  default: false,
+                  description: "If true, automatically publish to site after render completes."
+                }
               },
               required: ["id"]
+            }
+          },
+          {
+            name: "publish_comic",
+            description: "Publish a rendered (or already published) comic to the configured SITE_API_URL. Returns published_url when WEB_PUBLIC_URL is set.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                id: { type: "string", description: "Scenario ID (8 chars hex)" }
+              },
+              required: ["id"]
+            }
+          },
+          {
+            name: "create_book_html",
+            description: "Render a knowledge book HTML from a published/rendered scenario. Generates data/comics/<id>-book.html with the chosen style palette and glossary. Available styles: sentry, ramstein, hornsdale, partition, puppet, ai-paradox, stalker.",
+            inputSchema: {
+              type: "object",
+              properties: {
+                scenario_id: {
+                  type: "string",
+                  description: "Scenario ID (8 chars hex)"
+                },
+                style: {
+                  type: "string",
+                  enum: ["sentry", "ramstein", "hornsdale", "partition", "puppet", "ai-paradox", "stalker"],
+                  description: "Book style (palette + default glossary)"
+                },
+                title: { type: "string", description: "Override book title (default: scenario title)" },
+                subtitle: { type: "string", description: "Override book subtitle" },
+                provider: { type: "string", description: "Render provider name shown in footer (default: minimax)" }
+              },
+              required: ["scenario_id", "style"]
             }
           },
           {
@@ -204,11 +280,26 @@ class ComicStudioMcpServer {
         }
 
         if (name === "create_comic") {
-          const res = await this.apiFetch(`/api/scenarios`, "POST", {
+          const body = {
             content: args.content,
             image_style: args.image_style,
-            caption_style: args.caption_style
-          });
+            caption_style: args.caption_style,
+          };
+          if (args.panel_count !== undefined && args.panel_count !== null) {
+            body.panel_count = args.panel_count;
+          }
+          const res = await this.apiFetch(`/api/scenarios`, "POST", body);
+          return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+        }
+
+        if (name === "expand_panels") {
+          const body = {
+            target_count: args.target_count,
+          };
+          if (Array.isArray(args.scene_hints) && args.scene_hints.length) {
+            body.scene_hints = args.scene_hints;
+          }
+          const res = await this.apiFetch(`/api/scenarios/${args.id}/expand`, "POST", body);
           return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
         }
 
@@ -218,9 +309,31 @@ class ComicStudioMcpServer {
         }
 
         if (name === "render_comic") {
-          const res = await this.apiFetch(`/api/scenarios/${args.id}/render`, "POST", {
-            mode: args.mode || "initial"
-          });
+          const body = {
+            mode: args.mode || "initial",
+          };
+          if (args.provider) body.provider = args.provider;
+          if (args.publish !== undefined) body.publish = Boolean(args.publish);
+          const res = await this.apiFetch(`/api/scenarios/${args.id}/render`, "POST", body);
+          return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+        }
+
+        if (name === "publish_comic") {
+          const res = await this.apiFetch(`/api/scenarios/${args.id}/publish`, "POST", {});
+          // After publish job completes, query the published scenario for the URL.
+          // Note: the publish is async — for the URL the caller should poll the
+          // scenario via get_scenario(id) after the job finishes.
+          return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+        }
+
+        if (name === "create_book_html") {
+          const body = {
+            style: args.style,
+          };
+          if (args.title) body.title = args.title;
+          if (args.subtitle) body.subtitle = args.subtitle;
+          if (args.provider) body.provider = args.provider;
+          const res = await this.apiFetch(`/api/scenarios/${args.scenario_id}/book`, "POST", body);
           return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
         }
 

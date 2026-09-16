@@ -19,10 +19,12 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
     const content = validate.boundedText(body.content, { field: 'content', max: config.maxContentChars, code: 'INVALID_CONTENT' });
     const imageStyle = validate.imageStyle(body.image_style || 'comic');
     const captionStyle = validate.captionStyle(body.caption_style || 'bubble');
+    const panelCount = validate.panelCount(body.panel_count);
     const source = validate.classifyContent(content);
     const args = [
       'scripts/ingest_and_draft.py', '--skip-notify', '--json-result',
       '--image-style', imageStyle, '--style', captionStyle,
+      '--panels', String(panelCount),
       source.flag, source.value,
     ];
     const processResult = await runner.run(config.pythonBin, args, {
@@ -37,7 +39,59 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
     const id = validate.scenarioId(result.id);
     const candidate = store.get(id);
     if (candidate.state !== 'draft') throw conflict('INVALID_DRAFT_RESULT', 'Created scenario is not in draft state');
-    res.status(201).json({ ok: true, id, status: 'draft', request_id: req.id });
+    res.status(201).json({
+      ok: true,
+      id,
+      status: 'draft',
+      panel_count: panelCount,
+      request_id: req.id,
+    });
+  }));
+
+  // Expand an existing draft scenario with additional panels (3..6).
+  // Incremental: adds one panel at a time via LLM, preserves existing panels.
+  // On LLM failure returns { ok: true, fallback: true, panels_unchanged: true }
+  // WITHOUT changing the scenario file (similar to T1 revision fallback).
+  router.post('/:id/expand', asyncRoute(async (req, res) => {
+    const id = validate.scenarioId(req.params.id);
+    const body = req.body || {};
+    const targetCount = validate.panelCount(body.target_count);
+    const sceneHints = Array.isArray(body.scene_hints) ? body.scene_hints : [];
+    if (sceneHints.length > validate.MAX_PANEL_COUNT) {
+      throw badRequest('TOO_MANY_HINTS', `scene_hints supports at most ${validate.MAX_PANEL_COUNT} items`);
+    }
+    // Quick pre-check: scenario must exist and be a draft
+    const candidate = store.find(id);
+    if (!candidate) throw notFound('SCENARIO_NOT_FOUND', `Scenario ${id} not found`);
+    if (candidate.state !== 'draft') {
+      throw conflict('EXPANSION_REQUIRES_DRAFT', `Expansion requires draft state, got ${candidate.state}`);
+    }
+    const currentCount = Array.isArray(candidate.record.panels) ? candidate.record.panels.length : 0;
+    if (targetCount <= currentCount) {
+      throw badRequest('TARGET_NOT_GREATER', `target_count=${targetCount} must be greater than current panel count ${currentCount}`);
+    }
+    const args = ['scripts/expand_panels.py', '--scenario-id', id, '--target-count', String(targetCount), '--json-result'];
+    for (const hint of sceneHints) args.push('--scene-hint', String(hint));
+    const processResult = await runner.run(config.pythonBin, args, {
+      cwd: config.projectRoot,
+      timeoutMs: config.ingestTimeoutMs * 2,
+      outputLimit: config.processOutputLimit,
+      requestId: req.id,
+      operation: `scenario.expand:${id}`,
+    });
+    const result = parseJsonResult(processResult.stdout);
+    if (!result.ok) throw new Error(result.error || 'Expansion process failed');
+    res.status(result.fallback ? 200 : 201).json({
+      ok: true,
+      id,
+      status: 'draft',
+      panel_count: result.panel_count ?? currentCount,
+      added_panels: result.added_panels ?? [],
+      fallback: result.fallback || undefined,
+      fallback_reason: result.fallback ? result.reason : undefined,
+      warnings: result.warnings || undefined,
+      request_id: req.id,
+    });
   }));
 
   router.get('/:id', (req, res) => {
@@ -88,6 +142,8 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
   router.post('/:id/render', asyncRoute(async (req, res) => {
     const id = validate.scenarioId(req.params.id);
     const mode = validate.renderMode(req.body?.mode || 'initial');
+    const provider = validate.renderProvider(req.body?.provider);
+    const publish = Boolean(req.body?.publish);
     const active = jobManager.jobStore?.activeForScenario?.(id);
     if (active) throw conflict('BUSY', 'Another job is already active for this scenario', { job_id: active.id, type: active.type });
     const candidate = lifecycle.renderPolicy(id, mode);
@@ -96,8 +152,78 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
       renderSeed = validate.seed(req.body.seed, { min: config.minSeed, max: config.maxSeed });
       if (candidate.state === 'approved') await lifecycle.setSeed(id, renderSeed);
     }
-    const job = jobManager.enqueueRender({ scenarioId: id, mode, seed: renderSeed, requestId: req.id });
-    res.status(202).json({ ok: true, job: serializeJob(job), request_id: req.id });
+    const job = jobManager.enqueueRender({ scenarioId: id, mode, seed: renderSeed, requestId: req.id, provider, publish });
+    res.status(202).json({
+      ok: true,
+      job: serializeJob(job),
+      provider,
+      publish,
+      request_id: req.id,
+    });
+  }));
+
+  // Render a knowledge book HTML for a published scenario.
+  // Generates data/comics/<id>-book.html using the consolidated Jinja template +
+  // CSS from py/render/book/.
+  router.post('/:id/book', asyncRoute(async (req, res) => {
+    const id = validate.scenarioId(req.params.id);
+    const body = req.body || {};
+    const style = typeof body.style === 'string' ? body.style : '';
+    const allowedStyles = ['sentry', 'ramstein', 'hornsdale', 'partition', 'puppet', 'ai-paradox', 'stalker'];
+    if (!allowedStyles.includes(style)) {
+      throw badRequest('INVALID_BOOK_STYLE', `style must be one of: ${allowedStyles.join(', ')}`);
+    }
+    const candidate = store.find(id);
+    if (!candidate) throw notFound('SCENARIO_NOT_FOUND', `Scenario ${id} not found`);
+    if (!['rendered', 'published'].includes(candidate.state)) {
+      throw conflict('BOOK_REQUIRES_RENDERED', `Scenario must be rendered or published, got ${candidate.state}`);
+    }
+    const args = [
+      'scripts/render_book.py',
+      '--scenario-id', id,
+      '--style', style,
+      '--json-result',
+    ];
+    if (body.title) args.push('--title', String(body.title));
+    if (body.subtitle) args.push('--subtitle', String(body.subtitle));
+    if (body.provider) args.push('--provider', String(body.provider));
+    const processResult = await runner.run(config.pythonBin, args, {
+      cwd: config.projectRoot,
+      timeoutMs: config.publishTimeoutMs || 180_000,
+      outputLimit: config.processOutputLimit,
+      requestId: req.id,
+      operation: `scenario.book:${id}`,
+    });
+    const result = parseJsonResult(processResult.stdout);
+    if (!result.ok) throw new Error(result.error || 'Book rendering failed');
+    res.status(201).json({
+      ok: true,
+      scenario_id: id,
+      style,
+      path: result.path,
+      size_bytes: result.size_bytes,
+      size_kb: result.size_kb,
+      request_id: req.id,
+    });
+  }));
+
+  // Publish a rendered scenario to the configured SITE_API_URL.
+  // Returns published_url based on WEB_PUBLIC_URL (or local URL fallback).
+  router.post('/:id/publish', asyncRoute(async (req, res) => {
+    const id = validate.scenarioId(req.params.id);
+    const candidate = store.find(id);
+    if (!candidate) throw notFound('SCENARIO_NOT_FOUND', `Scenario ${id} not found`);
+    if (!['rendered', 'published'].includes(candidate.state)) {
+      throw conflict('PUBLISH_REQUIRES_RENDERED', `Scenario must be rendered or published, got ${candidate.state}`);
+    }
+    const active = jobManager.jobStore?.activeForScenario?.(id);
+    if (active) throw conflict('BUSY', 'Another job is already active for this scenario', { job_id: active.id, type: active.type });
+    const job = jobManager.enqueuePublish({ scenarioId: id, requestId: req.id });
+    res.status(202).json({
+      ok: true,
+      job: serializeJob(job),
+      request_id: req.id,
+    });
   }));
 
   router.post('/:id/seed', asyncRoute(async (req, res) => {
@@ -117,7 +243,7 @@ export function scenariosRouter({ config, store, lifecycle, runner, jobManager }
 
     const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const title = scenario.title || 'Без названия';
-    const style = scenario.style || 'star';
+    const style = scenario.style || 'bubble';
     const imageStyle = scenario.image_style || 'comic';
     const tone = scenario.tone || 'epic';
 
