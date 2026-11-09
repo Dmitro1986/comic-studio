@@ -174,12 +174,96 @@ bash cron/nightly.sh --dry-run
 
 Web tests используют temporary data roots и mocked subprocesses — live API credentials не нужны.
 
-## Документация
+## Hermes Agent Integration
 
-- [`ALGORITM.md`](ALGORITM.md) — фактический pipeline и lifecycle
-- [`docs/architecture.md`](docs/architecture.md) — архитектура
-- [`docs/workflow.md`](docs/workflow.md) — рабочие сценарии
-- [`docs/api.md`](docs/api.md) — Web API и security modes
-- [`docs/roadmap.md`](docs/roadmap.md) — обязательные follow-ups
-- [`CHANGELOG.md`](CHANGELOG.md) — хронология изменений
-- [`CLAUDE.md`](CLAUDE.md) — правила для AI-агентов
+Comic Studio може бути підключений як MCP-сервер до [Hermes Agent](https://hermes-agent.nousresearch.com) — тоді `mcp__comic_server__*` інструменти доступні прямо з чату.
+
+### 1. Запустити Comic Studio
+
+```bash
+cd ~/Projects/comic-studio  # або /home/ubuntu/projects/comics
+node web/server.js
+# Слухає на http://localhost:3000
+```
+
+### 2. Додати MCP у `~/.hermes/config.yaml`
+
+```yaml
+mcp_servers:
+  comic-server:
+    command: node
+    args:
+      - /home/ubuntu/projects/comics/mcp-server/index.js
+    env:
+      API_BASE_URL: http://127.0.0.1:3000
+
+  draw-things:
+    command: node
+    args:
+      - /home/ubuntu/projects/comics/mcp-server/draw-things/index.js
+    env:
+      DRAW_THINGS_URL: http://192.168.50.250:7860
+      DRAW_THINGS_TIMEOUT: '300'
+```
+
+### 3. Встановити скіли
+
+Скіли лежать в окремих директоріях. Скопіюйте їх у `~/.hermes/skills/`:
+
+```bash
+# Якщо у вас є hermes-agent source tree
+cp -r hermes-agent/skills/comic-book-pipeline ~/.hermes/skills/
+cp -r hermes-agent/skills/comic-book-styles ~/.hermes/skills/
+
+# Або створіть вручну — структура:
+#   ~/.hermes/skills/comic-book-pipeline/SKILL.md
+#   ~/.hermes/skills/comic-book-styles/SKILL.md
+```
+
+Або через вбудовані hermes-agent скіли:
+
+```bash
+hermes skills install official/creative/comic-book-pipeline
+hermes skills install official/creative/comic-book-styles
+```
+
+### 4. Перезапустити Hermes
+
+Після перезапуску будуть доступні:
+- MCP інструменти: `mcp__comic_server__create_comic`, `mcp__comic_server__approve_scenario`, `mcp__comic_server__render_comic`, `mcp__comic_server__create_book_html`, `mcp__comic_server__publish_comic`, `mcp__comic_server__wait_for_render`, `mcp__comic_server__list_scenarios`, `mcp__comic_server__get_scenario`, `mcp__comic_server__update_comic_text`, `mcp__comic_server__restyle_comic`, `mcp__comic_server__export_comic_zip`, `mcp__comic_server__export_comic_pdf`, `mcp__comic_server__revise_scenario`, `mcp__comic_server__expand_panels`, `mcp__comic_server__read_comic_image`, `mcp__comic_server__resolve_intent`
+- Draw Things MCP: `mcp__draw_things__generate_image`, `mcp__draw_things__get_options`
+- Скіли: `comic-book-pipeline` (end-to-end workflow), `comic-book-styles` (палітри + стилі)
+
+### Канонічний CLI для knowledge book
+
+Замість написання `/tmp/render_<topic>.py` щоразу:
+
+```bash
+python scripts/render_book_clean.py \
+  --scenario-id <id> \
+  --style kremlin-satire \
+  --title "..." \
+  --subtitle "..." \
+  --tagline "..." \
+  --epigraph "..." \
+  --narrative "..." \
+  --epilogue "..." \
+  --epilogue-author "..." \
+  --glossary "Термін 1::Визначення 1" \
+  --glossary "Термін 2::Визначення 2" \
+  --lang uk \
+  --source-url "https://..." \
+  --provider minimax
+```
+
+Див. `comic-book-pipeline` скіл для повного опису.
+
+## Документація
+
+- [`ALGORITM.md`](ALGORITM.md) — фактичний pipeline і lifecycle
+- [`docs/architecture.md`](docs/architecture.md) — архітектура
+- [`docs/workflow.md`](docs/workflow.md) — робочі сценарії
+- [`docs/api.md`](docs/api.md) — Web API і security modes
+- [`docs/roadmap.md`](docs/roadmap.md) — обов'язкові follow-ups
+- [`CHANGELOG.md`](CHANGELOG.md) — хронологія змін
+- [`CLAUDE.md`](CLAUDE.md) — правила для AI-агентів

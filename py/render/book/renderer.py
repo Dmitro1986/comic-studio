@@ -147,8 +147,11 @@ def _page_title_for_panel(panel: dict, fallback_index: int) -> str:
     """Derive a human-readable page title from panel caption or fallback."""
     caption = panel.get("caption") if isinstance(panel, dict) else None
     if caption and isinstance(caption, str) and caption.strip():
-        # Capitalise first letter
-        return caption.strip().rstrip('.').capitalize()
+        # Capitalise only the FIRST letter, preserving the rest verbatim.
+        # str.capitalize() lowercases everything else — which turns "Акт I" into
+        # "Акт i" (lowercase Roman numerals) and breaks the book's typography.
+        text = caption.strip().rstrip('.')
+        return text[:1].upper() + text[1:] if text else text
     return f"Акт {fallback_index + 1}"
 
 
@@ -201,6 +204,9 @@ def render_book_html(
     custom_epilogue: Optional[str] = None,
     custom_epilogue_author: Optional[str] = None,
     custom_tagline: Optional[str] = None,
+    custom_author: Optional[str] = None,
+    source_url: Optional[str] = None,
+    lang: Optional[str] = None,
     provider: str = "minimax",
 ) -> Path:
     """Render a knowledge book HTML for a published scenario.
@@ -227,6 +233,27 @@ def render_book_html(
         raise RenderBookError(
             f"Scenario {scenario_id!r} has no panels; cannot render book"
         )
+
+    # Resolve language: explicit arg → scenario field → default 'ru'
+    resolved_lang = lang or scenario.get("language") or "ru"
+    # Resolve source URL: explicit arg → scenario field → ""
+    resolved_source_url = source_url or scenario.get("source_url") or ""
+
+    # Localized UI strings per language
+    glossary_title_ru = "Кто есть кто"
+    glossary_title_uk = "Хто є хто"
+    epilogue_title_ru = "Контекст"
+    epilogue_title_uk = "Контекст"  # generic, suits both
+    sources_title_ru = "Ключевые источники"
+    sources_title_uk = "Ключові джерела"
+    if resolved_lang == "uk":
+        glossary_title = glossary_title_uk
+        epilogue_title = epilogue_title_uk
+        sources_title = sources_title_uk
+    else:
+        glossary_title = glossary_title_ru
+        epilogue_title = epilogue_title_ru
+        sources_title = sources_title_ru
 
     # Build panel descriptors
     panels: List[BookPanel] = []
@@ -267,6 +294,15 @@ def render_book_html(
     # Epilogue
     epilogue_text = custom_epilogue or ""
     epilogue_author = custom_epilogue_author or ""
+    # Author of the source material (different from epilogue_author, which signs the AI-written outro)
+    resolved_author = custom_author or scenario.get("author") or ""
+    # Localized label for the author block in glossary
+    author_label_ru = "Автор материала"
+    author_label_uk = "Автор матеріалу"
+    if resolved_lang == "uk":
+        author_label = author_label_uk
+    else:
+        author_label = author_label_ru
     if not epilogue_text and isinstance(scenario.get("context"), str):
         ctx = scenario["context"].strip()
         if len(ctx) > 800:
@@ -301,15 +337,21 @@ def render_book_html(
         tagline=tagline,
         epigraph=epigraph,
         glossary=glossary,
+        glossary_title=glossary_title,
+        epilogue_title=epilogue_title,
+        sources_title=sources_title,
         panels=[p.__dict__ for p in panels],
         narrative_paragraphs=narrative_paragraphs,
         epilogue_text=epilogue_text,
         epilogue_author=epilogue_author,
-        epilogue_title="Контекст",
         provider=provider,
         style_name=style_name,
         scenario_id=scenario_id,
         meta_lines=meta_lines,
+        lang=resolved_lang,
+        source_url=resolved_source_url,
+        author=resolved_author,
+        author_label=author_label,
     )
 
     # Atomic write

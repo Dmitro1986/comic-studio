@@ -14,6 +14,40 @@ from py.lib.logging_setup import setup
 
 logger = setup("render.minimax_client")
 
+# Настоящая сигнатура PNG: 89 50 4E 47 0D 0A 1A 0A
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+def _ensure_png_bytes(img_bytes: bytes) -> bytes:
+    """Normalise provider bytes to a real PNG stream.
+
+    MiniMax's image-01 may return JPEG (or WebP) bytes. We save them under a
+    ``.png`` filename and the web server sends ``Content-Type: image/png``.
+    Browsers sniff the actual bytes, detect the mismatch, and refuse to decode
+    the image — the panel silently never appears.
+
+    If the payload is already PNG we return it untouched; otherwise we decode
+    and re-encode it as PNG. Falls back to the original bytes if Pillow cannot
+    read them (so a real failure surfaces later instead of being masked here).
+    """
+    if img_bytes.startswith(_PNG_SIGNATURE):
+        return img_bytes
+
+    try:
+        import io
+
+        from PIL import Image
+
+        with Image.open(io.BytesIO(img_bytes)) as img:
+            img.load()
+            buffer = io.BytesIO()
+            img.convert("RGB").save(buffer, format="PNG", optimize=True)
+            logger.info("Converted provider payload (%s) to real PNG", img.format)
+            return buffer.getvalue()
+    except Exception as err:
+        logger.warning("Could not convert provider payload to PNG: %s", err)
+        return img_bytes
+
 
 def _convert_to_webp(png_path: Path, quality: int = 82) -> Optional[Path]:
     """Generates a WebP copy of a PNG image."""
@@ -108,6 +142,11 @@ def generate_image(
         img_bytes = img_resp.content
     else:
         img_bytes = base64.b64decode(img_b64)
+
+    # MiniMax может вернуть JPEG/WebP-байты под именем .png. Браузер сверяет
+    # MIME-заголовок (image/png) с реальными байтами и отказывается декодировать
+    # файл -> картинка не отображается. Приводим байты к настоящему PNG.
+    img_bytes = _ensure_png_bytes(img_bytes)
 
     out_path.write_bytes(img_bytes)
     save_cached_image(prompt_hash, img_bytes)

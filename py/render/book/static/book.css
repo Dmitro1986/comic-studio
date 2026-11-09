@@ -1,4 +1,4 @@
-/* Comic Studio Knowledge Book — generic CSS
+/* Visual Studio Knowledge Book — generic CSS
  * Variables injected from `py/render/book/palettes.py` at render time.
  * Required variables: --primary, --primary-light, --primary-dark,
  *                     --accent, --accent-light, --accent-dark,
@@ -93,15 +93,93 @@
       font-family: Georgia, serif;
     }
 
-    /* === Glossary === */
+    /* === Glossary (collapsible) === */
     .glossary {
       margin: 80px 0;
-      padding: 60px 40px;
+      padding: 0;
       border: 1px solid var(--primary);
       background: color-mix(in srgb, var(--primary) 6%, transparent);
       max-width: 900px;
       margin-left: auto;
       margin-right: auto;
+      overflow: hidden;
+    }
+
+    .glossary-toggle {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 22px 28px;
+      background: transparent;
+      border: none;
+      border-bottom: 1px solid transparent;
+      color: var(--accent-light);
+      font-family: inherit;
+      font-size: 1.15em;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-align: left;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .glossary-toggle:hover,
+    .glossary-toggle:focus-visible {
+      background: color-mix(in srgb, var(--primary) 18%, transparent);
+      border-bottom-color: var(--accent);
+      outline: none;
+    }
+
+    .glossary-toggle-count {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--accent) 18%, transparent);
+      border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+      color: var(--accent-light);
+      font-size: 0.7em;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+      transition: background 0.2s, transform 0.2s;
+    }
+
+    .glossary-toggle:hover .glossary-toggle-count,
+    .glossary-toggle:focus-visible .glossary-toggle-count {
+      background: color-mix(in srgb, var(--accent) 30%, transparent);
+      transform: translateY(-1px);
+    }
+
+    .glossary-toggle-text {
+      flex: 1;
+    }
+
+    .glossary-toggle-icon {
+      display: inline-block;
+      font-size: 0.9em;
+      transition: transform 0.25s ease;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .glossary[aria-expanded="true"] .glossary-toggle-icon,
+    .glossary-toggle[aria-expanded="true"] .glossary-toggle-icon {
+      transform: rotate(90deg);
+    }
+
+    .glossary-content {
+      padding: 12px 28px 36px 28px;
+      max-height: 5000px;
+      transition: max-height 0.4s ease, padding 0.3s ease;
+    }
+
+    .glossary-content[hidden] {
+      display: block;
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      overflow: hidden;
     }
 
     .glossary h2 {
@@ -135,6 +213,31 @@
       font-size: 1em;
       line-height: 1.7;
       color: var(--paper);
+    }
+
+    /* Author block — separated from the regular glossary terms */
+    .glossary dl.author-block {
+      display: block;
+      grid-template-columns: none;
+      margin: 28px 0 0 0;
+      padding-top: 22px;
+      border-top: 1px dashed var(--accent);
+    }
+    .glossary .author-label {
+      font-size: 0.78em;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--accent);
+      opacity: 0.85;
+      padding-top: 0 !important;
+    }
+    .glossary .author-name {
+      margin-top: 6px;
+      font-family: Georgia, serif;
+      font-style: italic;
+      font-size: 1.05em;
+      color: var(--paper);
+      line-height: 1.5;
     }
 
     @media (max-width: 768px) {

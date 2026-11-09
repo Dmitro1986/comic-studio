@@ -142,7 +142,41 @@ STYLE_PALETTES: dict[str, Palette] = {
         "shadow": "#050302",
         "name_ru": "S.T.A.L.K.E.R. · Zone",
     },
-}
+    "kremlin-satire": {
+        # Burgundy + cold dawn slate — satirical watercolor for the absurd inner
+        # life of the post-Soviet elite. Mid-tone paper, weary ink, no chrome.
+        "primary": "#6E4F7C",
+        "primary_light": "#8E6F9C",
+        "primary_dark": "#3E2F4C",
+        "accent": "#C9A14B",
+        "accent_light": "#E8C77E",
+        "accent_dark": "#8C6A26",
+        "paper": "#E8DCC4",
+        "paper_dark": "#7A6F5C",
+        "paper_light": "#F4E9D0",
+        "ink": "#1A1410",
+        "ink_light": "#3A2F26",
+        "shadow": "#0A0805",
+        "name_ru": "Кремлёвский водевиль · Satirical editorial",
+            },
+            "scandi-education": {
+                # Norwegian fjord-blue + cream paper. Educational documentary style.
+                # Cool teal-blue for analytical content, warm parchment for narrative.
+                "primary": "#1F4E6B",
+                "primary_light": "#3E7B9C",
+                "primary_dark": "#0F2D40",
+                "accent": "#C77D3C",
+                "accent_light": "#E8A86D",
+                "accent_dark": "#8C5520",
+                "paper": "#F4EBD9",
+                "paper_dark": "#8A8275",
+                "paper_light": "#FBF6EB",
+                "ink": "#102030",
+                "ink_light": "#2A3855",
+                "shadow": "#050A14",
+                "name_ru": "Норвегия · Бумага · Экраны · Книга",
+            },
+        }
 
 
 def to_css_vars(palette: Palette) -> str:

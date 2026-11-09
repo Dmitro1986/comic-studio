@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="{{ lang|default('ru') }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{{ title }} — knowledge comic</title>
+  <title>{{ title }} — visual essay</title>
   <style>
     {{ css_block }}
   </style>
@@ -31,16 +31,29 @@
       {% endif %}
     </div>
 
-    {# ═══ СПРАВКА (GLOSSARY) ═══ #}
+    {# ═══ СПРАВКА (GLOSSARY) — collapsible by default ═══ #}
     {% if glossary %}
     <div class="glossary" id="glossary">
-      <h2>Кто есть кто</h2>
-      <dl>
-        {% for term, definition in glossary %}
-        <dt>{{ term }}</dt>
-        <dd>{{ definition }}</dd>
-        {% endfor %}
-      </dl>
+      <button class="glossary-toggle" id="glossaryToggle" aria-expanded="false" aria-controls="glossaryContent">
+        <span class="glossary-toggle-icon" aria-hidden="true">▸</span>
+        <span class="glossary-toggle-text">{{ glossary_title }}</span>
+        <span class="glossary-toggle-count" id="glossaryCount" aria-hidden="true"></span>
+      </button>
+      <div class="glossary-content" id="glossaryContent" hidden>
+        <h2>{{ glossary_title }}</h2>
+        <dl>
+          {% for term, definition in glossary %}
+          <dt>{{ term }}</dt>
+          <dd>{{ definition }}</dd>
+          {% endfor %}
+        </dl>
+        {% if author %}
+        <dl class="author-block">
+          <dt class="author-label">{{ author_label }}</dt>
+          <dd class="author-name">{{ author }}</dd>
+        </dl>
+        {% endif %}
+      </div>
     </div>
     {% endif %}
 
@@ -92,9 +105,12 @@
 
     {# ═══ FOOTER ═══ #}
     <div class="footer">
-      <p>Конец хроники</p>
+      <p>{{ sources_title }}</p>
+      {% if source_url %}
+      <p class="source-link">🔗 <a href="{{ source_url }}" target="_blank" rel="noopener">{{ source_url }}</a></p>
+      {% endif %}
       <div class="tech">
-        Сгенерировано через Comic Studio · {{ provider|default('MiniMax') }} · {{ style_name }}<br>
+        Згенеровано через Visual Studio · {{ provider|default('MiniMax') }} · {{ style_name }}<br>
         Scenario ID: {{ scenario_id }} · {{ panels|length }} панелей
       </div>
     </div>
@@ -114,6 +130,46 @@
 
   <script>
     (function() {
+
+      // ── Collapsible glossary ──────────────────────────────────────
+      const glossaryToggle = document.getElementById('glossaryToggle');
+      const glossaryContent = document.getElementById('glossaryContent');
+      const glossaryCount = document.getElementById('glossaryCount');
+      if (glossaryToggle && glossaryContent) {
+        // Render the term count once at boot — clicked only flips visibility
+        if (glossaryCount) {
+          const terms = glossaryContent.querySelectorAll('dl:not(.author-block) > dt').length;
+          const plural = (n) => {
+            const mod10 = n % 10;
+            const mod100 = n % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'термин';
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'термина';
+            return 'терминов';
+          };
+          if (terms > 0) {
+            glossaryCount.textContent = `${terms} ${plural(terms)}`;
+          } else {
+            glossaryCount.textContent = '';
+          }
+        }
+
+        glossaryToggle.addEventListener('click', () => {
+          const isOpen = glossaryToggle.getAttribute('aria-expanded') === 'true';
+          const nextOpen = !isOpen;
+          glossaryToggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+          if (nextOpen) {
+            glossaryContent.removeAttribute('hidden');
+          } else {
+            // Allow the transition to play before hiding
+            setTimeout(() => {
+              if (glossaryToggle.getAttribute('aria-expanded') === 'false') {
+                glossaryContent.setAttribute('hidden', '');
+              }
+            }, 400);
+          }
+        });
+      }
+
       const comics = Array.from(document.querySelectorAll('.page-render'));
       const modal = document.getElementById('modal');
       const modalImg = document.getElementById('modalImg');

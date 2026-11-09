@@ -63,6 +63,8 @@ export function htmlStaticRouter({ config }) {
   // Регистрируется ПОСЛЕ `/comics/:id/fonts/:name` чтобы более специфичный
   // fonts route имел приоритет.
   const PANEL_RE = /^panel_[1-9][0-9]?\.(png|webp)$/;
+  // 🎬 Відео-ролики, згенеровані для коміксу (Gemini/Veo тощо)
+  const VIDEO_RE = /^[A-Za-z0-9_-]{1,64}\.mp4$/;
   router.get('/comics/:id/:name', asyncRoute(async (req, res, next) => {
     let id;
     try {
@@ -71,8 +73,8 @@ export function htmlStaticRouter({ config }) {
       return next(err);
     }
     const name = req.params.name;
-    if (!PANEL_RE.test(name)) {
-      // Не панель → передаём дальше (другие endpoints)
+    if (!PANEL_RE.test(name) && !VIDEO_RE.test(name)) {
+      // Не панель і не відео → передаём дальше (другие endpoints)
       return next();
     }
     let filePath;
@@ -97,6 +99,10 @@ export function htmlStaticRouter({ config }) {
     }
     if (name.endsWith('.webp')) {
       res.set('Content-Type', 'image/webp');
+      res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    } else if (name.endsWith('.mp4')) {
+      res.set('Content-Type', 'video/mp4');
+      res.set('Accept-Ranges', 'bytes');
       res.set('Cache-Control', 'public, max-age=31536000, immutable');
     } else {
       res.set('Content-Type', 'image/png');
